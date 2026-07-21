@@ -1,4 +1,4 @@
-from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand, recommend_bid_action, recommend_discard, run_round1_bidding, run_round2_bidding, legal_plays, is_legal_play, recommend_card_play, determine_trick_winner, play_trick, score_hand
+from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand, recommend_bid_action, recommend_discard, run_round1_bidding, run_round2_bidding, legal_plays, is_legal_play, recommend_card_play, determine_trick_winner, play_trick, score_hand, load_mmr, save_mmr, compute_quality_rate, update_mmr, difficulty_tier
 
 def test_deal_hands_gives_four_five_card_hands():
     deck = create_deck()
@@ -249,3 +249,40 @@ def test_score_hand_four_points_for_lone_march():
 def test_score_hand_euchre_gives_other_team_two_points():
     result = score_hand({0: 2, 1: 3}, making_team=0, went_alone=False)
     assert result == {0: 0, 1: 2}
+
+
+# --- MMR / difficulty tests ------------------------------------------------
+
+def test_load_mmr_returns_default_when_file_missing(tmp_path):
+    path = tmp_path / "mmr.json"
+    result = load_mmr(str(path))
+    assert result == {"mmr": 1000, "games_played": 0}
+
+
+def test_save_and_load_mmr_round_trip(tmp_path):
+    path = tmp_path / "mmr.json"
+    save_mmr({"mmr": 1234, "games_played": 5}, str(path))
+    assert load_mmr(str(path)) == {"mmr": 1234, "games_played": 5}
+
+
+def test_compute_quality_rate_counts_matches():
+    log = [("order_up", "order_up"), ("pass", "order_up"), (("9", "Hearts"), ("9", "Hearts"))]
+    assert compute_quality_rate(log) == 2 / 3
+
+
+def test_compute_quality_rate_empty_log_is_neutral():
+    assert compute_quality_rate([]) == 1.0
+
+
+def test_update_mmr_rewards_above_baseline():
+    assert update_mmr(1000, quality_rate=1.0) == 1000 + round(20 * (1.0 - 0.6))
+
+
+def test_update_mmr_penalizes_below_baseline():
+    assert update_mmr(1000, quality_rate=0.0) == 1000 + round(20 * (0.0 - 0.6))
+
+
+def test_difficulty_tier_thresholds():
+    assert difficulty_tier(800) == "easy"
+    assert difficulty_tier(1200) == "medium"
+    assert difficulty_tier(1600) == "hard"

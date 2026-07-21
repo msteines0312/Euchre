@@ -213,3 +213,43 @@ def score_hand(tricks_by_team, making_team, went_alone):
     if made_tricks == 5:
         return {making_team: 4 if went_alone else 2, other_team: 0}
     return {making_team: 1, other_team: 0}
+
+
+# --- MMR / difficulty --------------------------------------------------
+# K and BASELINE are tunable: BASELINE is the "expected at any rating"
+# decision-quality rate, K controls how fast MMR moves per hand.
+K = 20
+BASELINE = 0.6
+DEFAULT_MMR = {"mmr": 1000, "games_played": 0}
+
+
+def load_mmr(path="mmr.json"):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return dict(DEFAULT_MMR)
+
+
+def save_mmr(data, path="mmr.json"):
+    with open(path, "w") as f:
+        json.dump(data, f)
+
+
+def compute_quality_rate(decisions_log):
+    if not decisions_log:
+        return 1.0
+    matches = sum(1 for actual, recommended in decisions_log if actual == recommended)
+    return matches / len(decisions_log)
+
+
+def update_mmr(mmr, quality_rate):
+    return mmr + round(K * (quality_rate - BASELINE))
+
+
+def difficulty_tier(mmr):
+    if mmr < 900:
+        return "easy"
+    if mmr < 1500:
+        return "medium"
+    return "hard"
