@@ -1,4 +1,4 @@
-from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand, recommend_bid_action, recommend_discard, run_round1_bidding, run_round2_bidding, legal_plays, is_legal_play, recommend_card_play, determine_trick_winner, play_trick
+from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand, recommend_bid_action, recommend_discard, run_round1_bidding, run_round2_bidding, legal_plays, is_legal_play, recommend_card_play, determine_trick_winner, play_trick, score_hand
 
 def test_deal_hands_gives_four_five_card_hands():
     deck = create_deck()
@@ -233,3 +233,19 @@ def test_play_trick_skips_sitting_out_seat():
     seats_played = [seat for seat, card in plays]
     assert seats_played == [0, 2, 3]
     assert winner == 2
+
+def test_score_hand_one_point_for_three_or_four_tricks():
+    result = score_hand({0: 3, 1: 2}, making_team=0, went_alone=False)
+    assert result == {0: 1, 1: 0}
+
+def test_score_hand_two_points_for_march():
+    result = score_hand({0: 5, 1: 0}, making_team=0, went_alone=False)
+    assert result == {0: 2, 1: 0}
+
+def test_score_hand_four_points_for_lone_march():
+    result = score_hand({0: 5, 1: 0}, making_team=0, went_alone=True)
+    assert result == {0: 4, 1: 0}
+
+def test_score_hand_euchre_gives_other_team_two_points():
+    result = score_hand({0: 2, 1: 3}, making_team=0, went_alone=False)
+    assert result == {0: 0, 1: 2}

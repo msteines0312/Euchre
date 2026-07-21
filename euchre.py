@@ -200,3 +200,16 @@ def play_trick(hands, leader_seat, trump, sitting_out_seat, decision_fns):
         seat = (seat + 1) % 4
     winner_seat = determine_trick_winner(plays, trump)
     return winner_seat, plays
+
+
+# --- Scoring -------------------------------------------------------------
+
+def score_hand(tricks_by_team, making_team, went_alone):
+    other_team = 1 - making_team
+    made_tricks = tricks_by_team[making_team]
+
+    if made_tricks < 3:
+        return {making_team: 0, other_team: 2}
+    if made_tricks == 5:
+        return {making_team: 4 if went_alone else 2, other_team: 0}
+    return {making_team: 1, other_team: 0}
