@@ -46,6 +46,12 @@ def card_strength(card, trump):
 # --- Dealing -------------------------------------------------------------
 
 def deal_hands(deck):
+    """Slice an already-shuffled 24-card deck into 4 hands, an up-card, and a hidden kitty.
+
+    Assumes `deck` is already shuffled by the caller -- this function only slices it.
+    Layout: indices 0-19 become the 4 five-card hands (5 per seat), index 20
+    becomes the up-card, and indices 21-23 become the hidden kitty.
+    """
     hands = [deck[i * 5:(i + 1) * 5] for i in range(4)]
     up_card = deck[20]
     hidden_kitty = deck[21:24]
@@ -385,6 +391,8 @@ def play_hand(hands, dealer_seat, up_card, hidden_kitty, bid_decision_fns, card_
     making_team = TEAM_OF_SEAT[maker_seat]
     sitting_out_seat = (maker_seat + 2) % 4 if alone else None
 
+    print(f"Trump is {trump}. Seat {maker_seat} {'goes alone' if alone else 'made it'}.")
+
     tricks_by_team = {0: 0, 1: 0}
     leader_seat = (dealer_seat + 1) % 4
     if leader_seat == sitting_out_seat:
@@ -394,8 +402,10 @@ def play_hand(hands, dealer_seat, up_card, hidden_kitty, bid_decision_fns, card_
         winner_seat, plays = play_trick(hands, leader_seat, trump, sitting_out_seat, card_decision_fns)
         tricks_by_team[TEAM_OF_SEAT[winner_seat]] += 1
         leader_seat = winner_seat
+        print(f"Trick: {plays} -- Seat {winner_seat} wins.")
 
     points_by_team = score_hand(tricks_by_team, making_team, alone)
+    print(f"Hand result: {points_by_team}")
     return points_by_team, making_team, alone
 
 
@@ -412,6 +422,7 @@ def play_game(bid_decision_fns, card_decision_fns, discard_decision_fns):
             points_by_team, _, _ = result
             for team, points in points_by_team.items():
                 scores[team] += points
+            print(f"Score: {scores}")
         dealer_seat = (dealer_seat + 1) % 4
     return 0 if scores[0] > scores[1] else 1
 
@@ -423,6 +434,8 @@ def main():
     override = input("Press Enter to play at this difficulty, or type easy/medium/hard to override: ").strip()
     if override in MISTAKE_RATES:
         tier = override
+    elif override:
+        print(f"'{override}' not recognized, using {tier}.")
 
     decisions_log = []
     bid_decision_fns = [

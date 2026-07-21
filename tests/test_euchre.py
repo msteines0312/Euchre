@@ -1,5 +1,5 @@
 import random
-from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand, recommend_bid_action, recommend_discard, run_round1_bidding, run_round2_bidding, legal_plays, is_legal_play, recommend_card_play, determine_trick_winner, play_trick, score_hand, load_mmr, save_mmr, compute_quality_rate, update_mmr, difficulty_tier, apply_mistake, make_ai_bid_decision_fn, make_ai_card_decision_fn, make_ai_discard_decision_fn, play_hand
+from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand, recommend_bid_action, recommend_discard, run_round1_bidding, run_round2_bidding, legal_plays, is_legal_play, recommend_card_play, determine_trick_winner, play_trick, score_hand, load_mmr, save_mmr, compute_quality_rate, update_mmr, difficulty_tier, apply_mistake, make_ai_bid_decision_fn, make_ai_card_decision_fn, make_ai_discard_decision_fn, play_hand, play_game
 
 def test_deal_hands_gives_four_five_card_hands():
     deck = create_deck()
@@ -189,6 +189,15 @@ def test_recommend_card_play_wins_as_cheaply_as_possible():
     hand = [("9", "Hearts"), ("A", "Hearts")]
     result = recommend_card_play(hand, trick_so_far=[("10", "Hearts")], trump="Spades", led_suit="Hearts")
     assert result == ("A", "Hearts")
+
+def test_recommend_card_play_wins_with_cheapest_of_multiple_winners():
+    # Two cards can both beat the 10-Hearts already played (K and A of Hearts).
+    # This confirms recommend_card_play picks the cheaper winner (K), not the
+    # strongest one (A) -- a single-winner test can't tell min from max apart.
+    hand = [("K", "Hearts"), ("A", "Hearts")]
+    result = recommend_card_play(hand, trick_so_far=[("10", "Hearts")], trump="Spades", led_suit="Hearts")
+    assert result == ("K", "Hearts")
+
 
 def test_recommend_card_play_throws_lowest_when_cannot_win():
     hand = [("9", "Hearts"), ("10", "Hearts")]
@@ -468,3 +477,19 @@ def test_play_hand_scores_a_full_hand_deterministically():
     assert making_team == 0
     assert went_alone is False
     assert points_by_team[0] == 2  # march: seat 0's team holds all the trump/high cards
+
+
+# --- Full-game integration test ---------------------------------------------
+
+def test_play_game_runs_to_completion_with_all_ai_players():
+    # Zero mistake rate keeps this deterministic given the fixed seed below;
+    # the seed just needs to produce a game that terminates (guaranteed by
+    # the game logic, since a redeal only happens when everyone passes both
+    # bidding rounds, and stick_the_dealer is False by default -- that's rare
+    # but does not loop forever, it just deals again).
+    random.seed(42)
+    bid_decision_fns = [make_ai_bid_decision_fn(0.0) for _ in range(4)]
+    card_decision_fns = [make_ai_card_decision_fn(0.0) for _ in range(4)]
+    discard_decision_fns = [make_ai_discard_decision_fn(0.0) for _ in range(4)]
+    winning_team = play_game(bid_decision_fns, card_decision_fns, discard_decision_fns)
+    assert winning_team in (0, 1)
