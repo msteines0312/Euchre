@@ -70,3 +70,40 @@ def is_farmers_hand(hand):
 
 def swap_farmers_hand(hand, keep_cards, hidden_kitty):
     return keep_cards + hidden_kitty
+
+
+# --- Bidding AI heuristic --------------------------------------------------
+# Thresholds are deliberately simple and tunable -- adjust these to make the
+# AI more or less aggressive about bidding.
+ORDER_UP_THRESHOLD = 45
+ALONE_THRESHOLD = 80
+
+
+def hand_trump_strength(hand, trump):
+    trump_cards = [c for c in hand if effective_suit(c, trump) == trump]
+    return len(trump_cards) * 10 + sum(card_strength(c, trump) for c in trump_cards)
+
+
+def recommend_bid_action(hand, round_num, is_dealer, turned_suit=None, available_suits=None):
+    if round_num == 1:
+        strength = hand_trump_strength(hand, turned_suit)
+        if strength >= ALONE_THRESHOLD:
+            return "order_up_alone"
+        if strength >= ORDER_UP_THRESHOLD:
+            return "order_up"
+        return "pass"
+
+    best_suit, best_strength = None, -1
+    for suit in available_suits:
+        strength = hand_trump_strength(hand, suit)
+        if strength > best_strength:
+            best_suit, best_strength = suit, strength
+    if best_strength >= ALONE_THRESHOLD:
+        return (best_suit, True)
+    if best_strength >= ORDER_UP_THRESHOLD:
+        return (best_suit, False)
+    return "pass"
+
+
+def recommend_discard(hand, trump):
+    return min(hand, key=lambda c: card_strength(c, trump))

@@ -1,4 +1,4 @@
-from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand
+from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand, recommend_bid_action, recommend_discard
 
 def test_deal_hands_gives_four_five_card_hands():
     deck = create_deck()
@@ -75,3 +75,27 @@ def test_swap_farmers_hand_combines_kept_cards_and_kitty():
     new_hand = swap_farmers_hand(hand, keep_cards, hidden_kitty)
     assert len(new_hand) == 5
     assert sorted(new_hand) == sorted(keep_cards + hidden_kitty)
+
+def test_recommend_pass_on_weak_hand_round_1():
+    weak_hand = [("9", "Hearts"), ("10", "Diamonds"), ("Q", "Clubs"), ("9", "Diamonds"), ("K", "Hearts")]
+    assert recommend_bid_action(weak_hand, round_num=1, is_dealer=False, turned_suit="Spades") == "pass"
+
+def test_recommend_order_up_on_strong_hand_round_1():
+    strong_hand = [("J", "Spades"), ("J", "Clubs"), ("A", "Spades"), ("K", "Spades"), ("9", "Hearts")]
+    assert recommend_bid_action(strong_hand, round_num=1, is_dealer=False, turned_suit="Spades") == "order_up_alone"
+
+def test_recommend_pass_round_2_on_weak_hand():
+    weak_hand = [("9", "Hearts"), ("9", "Diamonds"), ("9", "Clubs"), ("10", "Spades"), ("K", "Spades")]
+    result = recommend_bid_action(weak_hand, round_num=2, is_dealer=False, available_suits=["Hearts", "Diamonds", "Clubs"])
+    assert result == "pass"
+
+def test_recommend_call_best_suit_round_2():
+    hand = [("J", "Diamonds"), ("J", "Hearts"), ("A", "Diamonds"), ("K", "Diamonds"), ("9", "Clubs")]
+    result = recommend_bid_action(hand, round_num=2, is_dealer=False, available_suits=["Hearts", "Diamonds", "Clubs"])
+    assert result[0] == "Diamonds"
+
+def test_recommend_discard_picks_weakest_card():
+    hand = [("9", "Hearts"), ("A", "Spades"), ("J", "Spades"), ("Q", "Diamonds"), ("K", "Clubs"), ("10", "Hearts")]
+    # trump is Spades: A/J-Spades are strong trump, the rest are weak off-suit cards.
+    # 9-Hearts is the single weakest card by card_strength.
+    assert recommend_discard(hand, trump="Spades") == ("9", "Hearts")
