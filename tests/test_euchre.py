@@ -99,3 +99,11 @@ def test_recommend_discard_picks_weakest_card():
     # trump is Spades: A/J-Spades are strong trump, the rest are weak off-suit cards.
     # 9-Hearts is the single weakest card by card_strength.
     assert recommend_discard(hand, trump="Spades") == ("9", "Hearts")
+
+def test_recommend_bid_action_forces_call_when_dealer_stuck():
+    weak_hand = [("9", "Hearts"), ("9", "Diamonds"), ("9", "Clubs"), ("10", "Spades"), ("K", "Spades")]
+    available_suits = ["Hearts", "Diamonds", "Clubs"]
+    assert recommend_bid_action(weak_hand, round_num=2, is_dealer=False, available_suits=available_suits) == "pass"
+    forced_result = recommend_bid_action(weak_hand, round_num=2, is_dealer=True, available_suits=available_suits)
+    assert forced_result != "pass"
+    assert forced_result[1] is False  # not alone -- hand isn't strong enough for that

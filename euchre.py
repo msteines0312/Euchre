@@ -100,7 +100,7 @@ def recommend_bid_action(hand, round_num, is_dealer, turned_suit=None, available
             best_suit, best_strength = suit, strength
     if best_strength >= ALONE_THRESHOLD:
         return (best_suit, True)
-    if best_strength >= ORDER_UP_THRESHOLD:
+    if best_strength >= ORDER_UP_THRESHOLD or is_dealer:
         return (best_suit, False)
     return "pass"
 
