@@ -333,3 +333,52 @@ def test_ai_discard_decision_fn_calls_recommend_discard_at_zero_mistake_rate():
     hand = [("9", "Hearts"), ("A", "Spades"), ("J", "Spades"), ("Q", "Diamonds"), ("K", "Clubs"), ("10", "Hearts")]
     result = decision_fn(hand, trump="Spades")
     assert result == ("9", "Hearts")
+
+
+def test_ai_bid_decision_fn_round2_forces_call_when_must_call():
+    rng = random.Random(0)
+    rng.random = lambda: 0.99  # never mistakes, isolates must_call behavior
+    decision_fn = make_ai_bid_decision_fn(mistake_rate=0.0, rng=rng)
+    weak_hand = [("9", "Hearts"), ("9", "Diamonds"), ("9", "Clubs"), ("10", "Spades"), ("K", "Spades")]
+    available_suits = ["Hearts", "Diamonds", "Clubs"]
+    # not forced: weak hand passes
+    assert decision_fn(weak_hand, available_suits, False) == "pass"
+    # forced: stick-the-dealer means must_call=True, so it must call a suit, not pass
+    forced_result = decision_fn(weak_hand, available_suits, True)
+    assert forced_result != "pass"
+
+
+def test_ai_bid_decision_fn_applies_mistake_when_rolled():
+    rng = random.Random(0)
+    rng.random = lambda: 0.01  # always mistakes
+    rng.choice = lambda options: options[0]
+    decision_fn = make_ai_bid_decision_fn(mistake_rate=0.5, rng=rng)
+    strong_hand = [("J", "Spades"), ("J", "Clubs"), ("A", "Spades"), ("K", "Spades"), ("9", "Hearts")]
+    result = decision_fn(strong_hand, "Spades")
+    # recommendation would be "order_up_alone"; a forced mistake substitutes "pass"
+    assert result == "pass"
+
+
+def test_ai_card_decision_fn_applies_mistake_when_rolled():
+    rng = random.Random(0)
+    rng.random = lambda: 0.01  # always mistakes
+    rng.choice = lambda options: options[0]
+    decision_fn = make_ai_card_decision_fn(mistake_rate=0.5, rng=rng)
+    hand = [("9", "Spades"), ("A", "Spades")]
+    result = decision_fn(hand, [], "Spades", None)
+    # recommendation when leading is the highest card (A-Spades); the mistake
+    # substitutes the other legal option instead
+    assert result == ("9", "Spades")
+
+
+def test_ai_discard_decision_fn_applies_mistake_when_rolled():
+    rng = random.Random(0)
+    rng.random = lambda: 0.01  # always mistakes
+    rng.choice = lambda options: options[0]
+    decision_fn = make_ai_discard_decision_fn(mistake_rate=0.5, rng=rng)
+    hand = [("9", "Hearts"), ("A", "Spades"), ("J", "Spades"), ("Q", "Diamonds"), ("K", "Clubs"), ("10", "Hearts")]
+    result = decision_fn(hand, trump="Spades")
+    # recommendation would be the weakest card (9-Hearts); confirm a mistake
+    # produces a DIFFERENT card from hand, not the recommendation
+    assert result != ("9", "Hearts")
+    assert result in hand
