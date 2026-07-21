@@ -50,3 +50,23 @@ def deal_hands(deck):
     up_card = deck[20]
     hidden_kitty = deck[21:24]
     return hands, up_card, hidden_kitty
+
+
+# --- Dealer pick-up, discard, and farmer's hand swap ---------------------
+
+def pick_up_card(dealer_hand, up_card):
+    return dealer_hand + [up_card]
+
+
+def discard(hand, card_to_discard):
+    new_hand = hand[:]
+    new_hand.remove(card_to_discard)
+    return new_hand
+
+
+def is_farmers_hand(hand):
+    return all(rank in ("9", "10") for rank, _ in hand)
+
+
+def swap_farmers_hand(hand, keep_cards, hidden_kitty):
+    return keep_cards + hidden_kitty
