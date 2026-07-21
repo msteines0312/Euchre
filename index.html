@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Euchre — Play Online</title>
+<meta name="description" content="A polished, single-player Euchre card game. Play against three AI opponents, right in your browser." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='19' font-size='20'%3E%F0%9F%83%8F%3C/text%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<div class="table-wrap">
+  <div class="table" id="table">
+
+    <header class="hud">
+      <div class="hud-cluster hud-left">
+        <div class="score-chip" id="score-chip-us">
+          <span class="score-chip-label">Us</span>
+          <span class="score-chip-value" id="score-us">0</span>
+        </div>
+        <div class="score-chip" id="score-chip-them">
+          <span class="score-chip-label">Them</span>
+          <span class="score-chip-value" id="score-them">0</span>
+        </div>
+      </div>
+      <div class="hud-cluster hud-right">
+        <button class="icon-btn" id="settings-btn" aria-label="Open settings" aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm8.4 3.5a7.9 7.9 0 0 0-.14-1.47l1.85-1.44a.6.6 0 0 0 .14-.77l-1.75-3.03a.6.6 0 0 0-.73-.26l-2.18.88a8.1 8.1 0 0 0-1.27-.74l-.33-2.32a.6.6 0 0 0-.6-.5H9.47a.6.6 0 0 0-.6.5l-.33 2.32a8.1 8.1 0 0 0-1.27.74l-2.18-.88a.6.6 0 0 0-.73.26L2.6 8.31a.6.6 0 0 0 .14.77l1.85 1.44A7.9 7.9 0 0 0 4.45 12c0 .5.05.99.14 1.46l-1.85 1.45a.6.6 0 0 0-.14.77l1.75 3.03c.15.26.46.36.73.26l2.18-.88c.4.3.82.55 1.27.74l.33 2.32c.05.3.3.5.6.5h3.5c.3 0 .55-.2.6-.5l.33-2.32c.45-.19.87-.44 1.27-.74l2.18.88c.27.1.58 0 .73-.26l1.75-3.03a.6.6 0 0 0-.14-.77l-1.85-1.45c.09-.47.14-.96.14-1.46Z"/></svg>
+        </button>
+        <button class="icon-btn" id="rules-btn" aria-label="How to play" aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm.75 15h-1.5v-1.5h1.5V17Zm1.55-6.13c-.36.4-.98.86-1.3 1.2-.32.34-.5.63-.5 1.18v.25h-1.5v-.35c0-.72.25-1.2.68-1.68.34-.38.86-.75 1.15-1.05.3-.32.48-.63.48-1.06 0-.84-.68-1.36-1.6-1.36-.85 0-1.5.44-1.72 1.24l-1.4-.58C8.03 6.9 9.32 6 11.06 6c1.98 0 3.3 1.15 3.3 2.75 0 .78-.34 1.4-.86 2.12Z"/></svg>
+        </button>
+        <div class="difficulty-chip" id="difficulty-chip" title="Your AI difficulty tier, based on decision quality">
+          <span class="dot" id="difficulty-dot"></span>
+          <span id="difficulty-label">Medium</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="trump-banner hidden" id="trump-banner">
+      <span class="trump-label">Trump</span>
+      <span class="trump-suit" id="trump-suit-display"></span>
+      <span class="maker-label" id="maker-label"></span>
+    </div>
+
+    <div class="seat seat-top" id="seat-2">
+      <div class="hand hand-top" id="hand-2"></div>
+      <div class="nameplate"><span class="name">North</span><span class="tricks-pill" id="tricks-2">0</span></div>
+    </div>
+
+    <div class="seat seat-left" id="seat-3">
+      <div class="hand hand-left" id="hand-3"></div>
+      <div class="nameplate"><span class="name">West</span><span class="tricks-pill" id="tricks-3">0</span></div>
+    </div>
+
+    <div class="seat seat-right" id="seat-1">
+      <div class="hand hand-right" id="hand-1"></div>
+      <div class="nameplate"><span class="name">East</span><span class="tricks-pill" id="tricks-1">0</span></div>
+    </div>
+
+    <div class="center-area" id="center-area">
+      <div class="kitty-slot" id="kitty-slot">
+        <div class="upcard-holder" id="upcard-holder"></div>
+      </div>
+      <div class="trick-slot trick-slot-0" id="trick-0"></div>
+      <div class="trick-slot trick-slot-1" id="trick-1"></div>
+      <div class="trick-slot trick-slot-2" id="trick-2"></div>
+      <div class="trick-slot trick-slot-3" id="trick-3"></div>
+      <div class="dealer-chip" id="dealer-chip">D</div>
+    </div>
+
+    <div class="seat seat-bottom" id="seat-0">
+      <div class="nameplate"><span class="name">You</span><span class="tricks-pill" id="tricks-0">0</span></div>
+      <div class="hand hand-bottom" id="hand-0"></div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </div>
+</div>
+
+<!-- Start screen -->
+<div class="overlay" id="start-overlay">
+  <div class="overlay-panel start-panel">
+    <h1 class="logo">Euchre<span class="logo-dot">.</span></h1>
+    <p class="tagline">Three-round bidding. Left bower steals the show. First to 10 wins.</p>
+
+    <div class="start-stats">
+      <div class="stat-card">
+        <span class="stat-label">Your MMR</span>
+        <span class="stat-value" id="start-mmr">1000</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Difficulty</span>
+        <span class="stat-value" id="start-difficulty">Medium</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Games Played</span>
+        <span class="stat-value" id="start-games">0</span>
+      </div>
+    </div>
+
+    <button class="btn btn-primary btn-lg" id="new-game-btn">Deal Me In</button>
+    <button class="btn btn-ghost" id="start-settings-btn">House Rules &amp; Difficulty</button>
+  </div>
+</div>
+
+<!-- Round 1 bidding -->
+<div class="overlay hidden" id="bid1-overlay">
+  <div class="overlay-panel bid-panel">
+    <p class="overlay-eyebrow">Round 1 &mdash; Order it up?</p>
+    <div class="bid-upcard" id="bid1-upcard"></div>
+    <p class="bid-prompt">Dealer may pick up the <span id="bid1-suit-name"></span> up-card.</p>
+    <div class="bid-actions">
+      <button class="btn btn-primary" id="bid1-order-btn">Order It Up</button>
+      <button class="btn btn-primary btn-alone" id="bid1-alone-btn">Order Up &amp; Go Alone</button>
+      <button class="btn btn-ghost" id="bid1-pass-btn">Pass</button>
+    </div>
+  </div>
+</div>
+
+<!-- Round 2 bidding -->
+<div class="overlay hidden" id="bid2-overlay">
+  <div class="overlay-panel bid-panel">
+    <p class="overlay-eyebrow" id="bid2-eyebrow">Round 2 &mdash; Name it</p>
+    <p class="bid-prompt" id="bid2-prompt">Call any suit other than the turned-down suit.</p>
+    <div class="suit-grid" id="bid2-suit-grid"></div>
+    <label class="alone-toggle">
+      <input type="checkbox" id="bid2-alone-check" />
+      <span>Go alone with this call</span>
+    </label>
+    <div class="bid-actions">
+      <button class="btn btn-ghost" id="bid2-pass-btn">Pass</button>
+    </div>
+  </div>
+</div>
+
+<!-- Farmer's hand swap -->
+<div class="overlay hidden" id="farmers-overlay">
+  <div class="overlay-panel">
+    <p class="overlay-eyebrow">Farmer's Hand</p>
+    <p class="bid-prompt">Your hand is all 9s and 10s. House rules let you swap up to 3 cards with the kitty.</p>
+    <p class="bid-prompt subtle">Select cards below to <em>keep</em>, then confirm. Unselected cards go to the kitty.</p>
+    <div class="hand hand-modal" id="farmers-hand-cards"></div>
+    <div class="bid-actions">
+      <button class="btn btn-primary" id="farmers-confirm-btn">Confirm Swap</button>
+      <button class="btn btn-ghost" id="farmers-skip-btn">Keep My Hand</button>
+    </div>
+  </div>
+</div>
+
+<!-- Discard after pickup -->
+<div class="overlay hidden" id="discard-overlay">
+  <div class="overlay-panel">
+    <p class="overlay-eyebrow">Dealer's Discard</p>
+    <p class="bid-prompt">You picked up the up-card. Choose one card to bury in the kitty.</p>
+    <div class="hand hand-modal" id="discard-hand-cards"></div>
+  </div>
+</div>
+
+<!-- Hand result -->
+<div class="overlay hidden" id="hand-result-overlay">
+  <div class="overlay-panel result-panel">
+    <p class="overlay-eyebrow">Hand Complete</p>
+    <h2 class="result-headline" id="result-headline"></h2>
+    <p class="result-detail" id="result-detail"></p>
+    <div class="result-score">
+      <div class="stat-card"><span class="stat-label">Us</span><span class="stat-value" id="result-score-us">0</span></div>
+      <div class="stat-card"><span class="stat-label">Them</span><span class="stat-value" id="result-score-them">0</span></div>
+    </div>
+    <button class="btn btn-primary" id="next-hand-btn">Next Hand</button>
+  </div>
+</div>
+
+<!-- Game over -->
+<div class="overlay hidden" id="game-over-overlay">
+  <div class="overlay-panel result-panel">
+    <p class="overlay-eyebrow" id="game-over-eyebrow">Game Over</p>
+    <h2 class="result-headline" id="game-over-headline"></h2>
+    <div class="result-score">
+      <div class="stat-card"><span class="stat-label">MMR Change</span><span class="stat-value" id="mmr-change">+0</span></div>
+      <div class="stat-card"><span class="stat-label">Decision Quality</span><span class="stat-value" id="quality-rate">0%</span></div>
+    </div>
+    <button class="btn btn-primary" id="rematch-btn">Play Again</button>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="overlay hidden" id="settings-overlay">
+  <div class="overlay-panel">
+    <p class="overlay-eyebrow">House Rules &amp; Difficulty</p>
+
+    <div class="setting-row">
+      <div>
+        <span class="setting-title">Allow going alone</span>
+        <span class="setting-sub">Play a hand solo for double points</span>
+      </div>
+      <label class="switch"><input type="checkbox" id="rule-alone" checked /><span class="slider"></span></label>
+    </div>
+    <div class="setting-row">
+      <div>
+        <span class="setting-title">Stick the dealer</span>
+        <span class="setting-sub">Dealer must call trump in round 2</span>
+      </div>
+      <label class="switch"><input type="checkbox" id="rule-stick" /><span class="slider"></span></label>
+    </div>
+    <div class="setting-row">
+      <div>
+        <span class="setting-title">Farmer's hand</span>
+        <span class="setting-sub">Swap an all-9s/10s hand with the kitty</span>
+      </div>
+      <label class="switch"><input type="checkbox" id="rule-farmers" /><span class="slider"></span></label>
+    </div>
+
+    <div class="setting-row setting-row-column">
+      <span class="setting-title">Difficulty override</span>
+      <div class="suit-grid difficulty-grid">
+        <button class="btn btn-choice" data-difficulty="auto">Auto (MMR)</button>
+        <button class="btn btn-choice" data-difficulty="easy">Easy</button>
+        <button class="btn btn-choice" data-difficulty="medium">Medium</button>
+        <button class="btn btn-choice" data-difficulty="hard">Hard</button>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="settings-close-btn">Done</button>
+  </div>
+</div>
+
+<!-- How to play -->
+<div class="overlay hidden" id="rules-overlay">
+  <div class="overlay-panel rules-panel">
+    <p class="overlay-eyebrow">How To Play</p>
+    <div class="rules-body">
+      <p><strong>The deck.</strong> 24 cards: 9 through Ace in each suit. You and the seat across from you (North) are partners against East and West.</p>
+      <p><strong>Bidding.</strong> Each hand, a card is turned up. In round 1, players may order it up (dealer picks it up as trump). If everyone passes, round 2 lets anyone name a different suit as trump.</p>
+      <p><strong>Bowers.</strong> The Jack of trump (right bower) is the top card. The same-color Jack (left bower) is second, and counts as trump.</p>
+      <p><strong>Tricks.</strong> Highest card of the suit led wins, unless trumped. Winner leads next. Five tricks per hand.</p>
+      <p><strong>Scoring.</strong> Making team gets 1 point (3&ndash;4 tricks), 2 points (all 5, a "march"), or 4 points for a lone march. If the makers fail, the defenders score 2 ("euchred").</p>
+      <p><strong>First to 10 points wins the game.</strong></p>
+    </div>
+    <button class="btn btn-primary" id="rules-close-btn">Got It</button>
+  </div>
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

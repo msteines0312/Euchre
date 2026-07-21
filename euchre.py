@@ -316,7 +316,7 @@ def make_human_bid_decision_fn(decisions_log):
             )
             choices = turned_suit_or_available + (["pass"] if not must_call else [])
             raw = _prompt_choice(f"Call a suit ({', '.join(choices)}) or pass: ", choices)
-            actual = "pass" if raw == "pass" else (raw, False)
+            actual = "pass" if raw == "pass" else (raw, False)  # False = not going alone (round 2 alone calls aren't offered here yet)
         else:
             recommended = recommend_bid_action(hand, round_num=1, is_dealer=False, turned_suit=turned_suit_or_available)
             raw = _prompt_choice("Order it up, go alone, or pass? (order_up/order_up_alone/pass): ",
@@ -333,8 +333,12 @@ def make_human_card_decision_fn(decisions_log):
         options = legal_plays(hand, led_suit, trump)
         print(f"Your hand: {hand}")
         print(f"Legal plays: {options}")
-        raw = input("Play a card (rank suit): ").strip().split()
-        actual = (raw[0], raw[1])
+        while True:
+            raw = input("Play a card (rank suit): ").strip().split()
+            if len(raw) == 2 and tuple(raw) in options:
+                actual = (raw[0], raw[1])
+                break
+            print(f"Please enter one of: {options}")
         decisions_log.append((actual, recommended))
         return actual
     return decision_fn
@@ -344,8 +348,12 @@ def make_human_discard_decision_fn(decisions_log):
     def decision_fn(hand, trump):
         recommended = recommend_discard(hand, trump)
         print(f"Your hand after picking up the up-card: {hand}")
-        raw = input("Discard a card (rank suit): ").strip().split()
-        actual = (raw[0], raw[1])
+        while True:
+            raw = input("Discard a card (rank suit): ").strip().split()
+            if len(raw) == 2 and tuple(raw) in hand:
+                actual = (raw[0], raw[1])
+                break
+            print(f"Please enter one of: {hand}")
         decisions_log.append((actual, recommended))
         return actual
     return decision_fn

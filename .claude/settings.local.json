@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sed -i '525s/23 passed/24 passed/' 2026-07-21-euchre-game-implementation.md)",
+      "Bash(sed -i '631s/31 passed/32 passed/' 2026-07-21-euchre-game-implementation.md)",
+      "Bash(sed -i '747s/36 passed/37 passed/' 2026-07-21-euchre-game-implementation.md)",
+      "Bash(sed -i '813s/40 passed/41 passed/' 2026-07-21-euchre-game-implementation.md)",
+      "Bash(sed -i '919s/47 passed/48 passed/' 2026-07-21-euchre-game-implementation.md)"
+    ]
+  }
+}

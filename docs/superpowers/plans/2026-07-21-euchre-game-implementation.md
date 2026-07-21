@@ -344,7 +344,11 @@ def test_recommend_order_up_on_strong_hand_round_1():
     assert recommend_bid_action(strong_hand, round_num=1, is_dealer=False, turned_suit="Spades") == "order_up_alone"
 
 def test_recommend_pass_round_2_on_weak_hand():
-    weak_hand = [("9", "Hearts"), ("10", "Diamonds"), ("Q", "Clubs"), ("9", "Diamonds"), ("K", "Hearts")]
+    # Corrected during implementation: the original fixture here (9H,10D,QC,9D,KH)
+    # scores 64 in Hearts (2 trump cards incl. a King), clearing ORDER_UP_THRESHOLD=45 --
+    # it was weak against Spades (round 1's trump) but not weak in every round-2 suit.
+    # This hand scores 30 in Hearts/Diamonds/Clubs alike (one lone 9 each), correctly "pass".
+    weak_hand = [("9", "Hearts"), ("9", "Diamonds"), ("9", "Clubs"), ("10", "Spades"), ("K", "Spades")]
     result = recommend_bid_action(weak_hand, round_num=2, is_dealer=False, available_suits=["Hearts", "Diamonds", "Clubs"])
     assert result == "pass"
 
@@ -359,6 +363,16 @@ def test_recommend_discard_picks_weakest_card():
     # trump is Spades: A/J-Spades are strong trump, the rest are weak off-suit cards.
     # 9-Hearts is the single weakest card by card_strength.
     assert recommend_discard(hand, trump="Spades") == ("9", "Hearts")
+
+def test_recommend_bid_action_forces_call_when_dealer_stuck():
+    # is_dealer=True models "stick the dealer": round 2 forces a call even on
+    # a weak hand, instead of allowing "pass".
+    weak_hand = [("9", "Hearts"), ("9", "Diamonds"), ("9", "Clubs"), ("10", "Spades"), ("K", "Spades")]
+    available_suits = ["Hearts", "Diamonds", "Clubs"]
+    assert recommend_bid_action(weak_hand, round_num=2, is_dealer=False, available_suits=available_suits) == "pass"
+    forced_result = recommend_bid_action(weak_hand, round_num=2, is_dealer=True, available_suits=available_suits)
+    assert forced_result != "pass"
+    assert forced_result[1] is False
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -397,7 +411,9 @@ def recommend_bid_action(hand, round_num, is_dealer, turned_suit=None, available
             best_suit, best_strength = suit, strength
     if best_strength >= ALONE_THRESHOLD:
         return (best_suit, True)
-    if best_strength >= ORDER_UP_THRESHOLD:
+    # is_dealer means "stuck the dealer": round 2 forces a call, so a weak
+    # hand still calls the best available suit rather than passing.
+    if best_strength >= ORDER_UP_THRESHOLD or is_dealer:
         return (best_suit, False)
     return "pass"
 
@@ -409,7 +425,7 @@ def recommend_discard(hand, trump):
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/test_euchre.py -v`
-Expected: PASS (18 passed)
+Expected: PASS (19 passed)
 
 - [ ] **Step 5: Commit**
 
@@ -522,7 +538,7 @@ def run_round2_bidding(hands, turned_suit, dealer_seat, decision_fns, stick_the_
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/test_euchre.py -v`
-Expected: PASS (24 passed)
+Expected: PASS (25 passed)
 
 - [ ] **Step 5: Commit**
 
@@ -628,7 +644,7 @@ def recommend_card_play(hand, trick_so_far, trump, led_suit):
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/test_euchre.py -v`
-Expected: PASS (32 passed)
+Expected: PASS (33 passed)
 
 - [ ] **Step 5: Commit**
 
@@ -744,7 +760,7 @@ def play_trick(hands, leader_seat, trump, sitting_out_seat, decision_fns):
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/test_euchre.py -v`
-Expected: PASS (37 passed)
+Expected: PASS (38 passed)
 
 - [ ] **Step 5: Commit**
 
@@ -810,7 +826,7 @@ def score_hand(tricks_by_team, making_team, went_alone):
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/test_euchre.py -v`
-Expected: PASS (41 passed)
+Expected: PASS (42 passed)
 
 - [ ] **Step 5: Commit**
 
@@ -916,7 +932,7 @@ def difficulty_tier(mmr):
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/test_euchre.py -v`
-Expected: PASS (48 passed)
+Expected: PASS (49 passed)
 
 - [ ] **Step 5: Commit**
 
@@ -1035,7 +1051,7 @@ def make_ai_discard_decision_fn(mistake_rate, rng=random):
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/test_euchre.py -v`
-Expected: PASS (53 passed)
+Expected: PASS (54 passed)
 
 - [ ] **Step 5: Commit**
 
@@ -1157,7 +1173,7 @@ def make_human_discard_decision_fn(decisions_log):
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/test_euchre.py -v`
-Expected: PASS (56 passed)
+Expected: PASS (57 passed)
 
 - [ ] **Step 5: Commit**
 
@@ -1327,7 +1343,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `pytest tests/test_euchre.py -v`
-Expected: PASS (57 passed)
+Expected: PASS (58 passed)
 
 - [ ] **Step 5: Manual smoke test**
 

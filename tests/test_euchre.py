@@ -415,3 +415,25 @@ def test_human_discard_decision_fn_logs_recommendation(monkeypatch):
     result = decision_fn(hand, trump="Spades")
     assert result == ("9", "Hearts")
     assert decisions_log == [(("9", "Hearts"), ("9", "Hearts"))]
+
+
+def test_human_card_decision_fn_reprompts_on_invalid_input(monkeypatch):
+    from euchre import make_human_card_decision_fn
+    decisions_log = []
+    hand = [("9", "Spades"), ("A", "Spades")]
+    inputs = iter(["Q Hearts", "A Spades"])  # first is illegal, second is valid
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(inputs))
+    decision_fn = make_human_card_decision_fn(decisions_log)
+    result = decision_fn(hand, [], "Spades", None)
+    assert result == ("A", "Spades")
+
+
+def test_human_discard_decision_fn_reprompts_on_invalid_input(monkeypatch):
+    from euchre import make_human_discard_decision_fn
+    decisions_log = []
+    hand = [("9", "Hearts"), ("A", "Spades"), ("J", "Spades"), ("Q", "Diamonds"), ("K", "Clubs"), ("10", "Hearts")]
+    inputs = iter(["Z Nowhere", "9 Hearts"])  # first is illegal, second is valid
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(inputs))
+    decision_fn = make_human_discard_decision_fn(decisions_log)
+    result = decision_fn(hand, trump="Spades")
+    assert result == ("9", "Hearts")
