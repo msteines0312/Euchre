@@ -1,4 +1,4 @@
-from euchre import create_deck, SUITS, RANKS
+from euchre import create_deck, SUITS, RANKS, effective_suit, card_strength
 
 def test_create_deck_has_24_unique_cards():
     deck = create_deck()
@@ -10,3 +10,23 @@ def test_create_deck_has_all_suits_and_ranks():
     for suit in SUITS:
         for rank in RANKS:
             assert (rank, suit) in deck
+
+def test_left_bower_effective_suit_is_trump():
+    assert effective_suit(("J", "Clubs"), "Spades") == "Spades"
+
+def test_non_bower_effective_suit_is_own_suit():
+    assert effective_suit(("A", "Hearts"), "Spades") == "Hearts"
+
+def test_bower_ranking_order():
+    trump = "Spades"
+    right_bower = ("J", "Spades")
+    left_bower = ("J", "Clubs")
+    trump_ace = ("A", "Spades")
+    offsuit_ace = ("A", "Hearts")
+    assert card_strength(right_bower, trump) > card_strength(left_bower, trump)
+    assert card_strength(left_bower, trump) > card_strength(trump_ace, trump)
+    assert card_strength(trump_ace, trump) > card_strength(offsuit_ace, trump)
+
+def test_offsuit_cards_rank_by_face_value_only():
+    trump = "Spades"
+    assert card_strength(("A", "Hearts"), trump) > card_strength(("9", "Hearts"), trump)

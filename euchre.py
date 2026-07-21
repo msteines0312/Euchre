@@ -21,3 +21,23 @@ RULES = {
 
 def create_deck():
     return [(rank, suit) for suit in SUITS for rank in RANKS]
+
+
+# --- Trump / bower ranking ---------------------------------------------
+
+def effective_suit(card, trump):
+    rank, suit = card
+    if rank == "J" and SAME_COLOR[suit] == trump:
+        return trump
+    return suit
+
+
+def card_strength(card, trump):
+    rank, suit = card
+    if rank == "J" and suit == trump:
+        return 31  # right bower: highest card in the game
+    if rank == "J" and SAME_COLOR[suit] == trump:
+        return 30  # left bower: second-highest, printed suit doesn't matter
+    if effective_suit(card, trump) == trump:
+        return 20 + RANK_ORDER[rank]
+    return RANK_ORDER[rank]
