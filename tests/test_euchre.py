@@ -1,4 +1,5 @@
-from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand, recommend_bid_action, recommend_discard, run_round1_bidding, run_round2_bidding, legal_plays, is_legal_play, recommend_card_play, determine_trick_winner, play_trick, score_hand, load_mmr, save_mmr, compute_quality_rate, update_mmr, difficulty_tier
+import random
+from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand, recommend_bid_action, recommend_discard, run_round1_bidding, run_round2_bidding, legal_plays, is_legal_play, recommend_card_play, determine_trick_winner, play_trick, score_hand, load_mmr, save_mmr, compute_quality_rate, update_mmr, difficulty_tier, apply_mistake, make_ai_bid_decision_fn, make_ai_card_decision_fn, make_ai_discard_decision_fn
 
 def test_deal_hands_gives_four_five_card_hands():
     deck = create_deck()
@@ -288,3 +289,47 @@ def test_difficulty_tier_thresholds():
     assert difficulty_tier(1200) == "medium"
     assert difficulty_tier(1500) == "hard"
     assert difficulty_tier(1600) == "hard"
+
+
+# --- Difficulty mistake-rate wrapper -----------------------------------
+
+def test_apply_mistake_returns_recommended_when_roll_is_high():
+    rng = random.Random(0)
+    rng.random = lambda: 0.99  # never mistakes
+    result = apply_mistake("order_up", alternatives=["pass"], mistake_rate=0.5, rng=rng)
+    assert result == "order_up"
+
+
+def test_apply_mistake_returns_alternative_when_roll_is_low():
+    rng = random.Random(0)
+    rng.random = lambda: 0.01  # always mistakes
+    rng.choice = lambda options: options[0]
+    result = apply_mistake("order_up", alternatives=["pass"], mistake_rate=0.5, rng=rng)
+    assert result == "pass"
+
+
+def test_ai_bid_decision_fn_calls_recommend_bid_action_at_zero_mistake_rate():
+    rng = random.Random(0)
+    rng.random = lambda: 0.99
+    decision_fn = make_ai_bid_decision_fn(mistake_rate=0.0, rng=rng)
+    strong_hand = [("J", "Spades"), ("J", "Clubs"), ("A", "Spades"), ("K", "Spades"), ("9", "Hearts")]
+    result = decision_fn(strong_hand, "Spades")
+    assert result == "order_up_alone"
+
+
+def test_ai_card_decision_fn_calls_recommend_card_play_at_zero_mistake_rate():
+    rng = random.Random(0)
+    rng.random = lambda: 0.99
+    decision_fn = make_ai_card_decision_fn(mistake_rate=0.0, rng=rng)
+    hand = [("9", "Spades"), ("A", "Spades")]
+    result = decision_fn(hand, [], "Spades", None)
+    assert result == ("A", "Spades")
+
+
+def test_ai_discard_decision_fn_calls_recommend_discard_at_zero_mistake_rate():
+    rng = random.Random(0)
+    rng.random = lambda: 0.99
+    decision_fn = make_ai_discard_decision_fn(mistake_rate=0.0, rng=rng)
+    hand = [("9", "Hearts"), ("A", "Spades"), ("J", "Spades"), ("Q", "Diamonds"), ("K", "Clubs"), ("10", "Hearts")]
+    result = decision_fn(hand, trump="Spades")
+    assert result == ("9", "Hearts")

@@ -253,3 +253,45 @@ def difficulty_tier(mmr):
     if mmr < 1500:
         return "medium"
     return "hard"
+
+
+# --- Difficulty mistake-rate wrapper -----------------------------------
+
+MISTAKE_RATES = {"easy": 0.30, "medium": 0.15, "hard": 0.0}
+
+
+def apply_mistake(recommended, alternatives, mistake_rate, rng=random):
+    if alternatives and rng.random() < mistake_rate:
+        return rng.choice(alternatives)
+    return recommended
+
+
+def make_ai_bid_decision_fn(mistake_rate, rng=random):
+    def decision_fn(hand, turned_suit_or_available, must_call=False):
+        if isinstance(turned_suit_or_available, list):
+            recommended = recommend_bid_action(
+                hand, round_num=2, is_dealer=must_call, available_suits=turned_suit_or_available
+            )
+            alternatives = ["pass"] if recommended != "pass" and not must_call else []
+        else:
+            recommended = recommend_bid_action(hand, round_num=1, is_dealer=False, turned_suit=turned_suit_or_available)
+            alternatives = ["pass"] if recommended != "pass" else []
+        return apply_mistake(recommended, alternatives, mistake_rate, rng)
+    return decision_fn
+
+
+def make_ai_card_decision_fn(mistake_rate, rng=random):
+    def decision_fn(hand, trick_so_far, trump, led_suit):
+        recommended = recommend_card_play(hand, trick_so_far, trump, led_suit)
+        options = legal_plays(hand, led_suit, trump)
+        alternatives = [c for c in options if c != recommended]
+        return apply_mistake(recommended, alternatives, mistake_rate, rng)
+    return decision_fn
+
+
+def make_ai_discard_decision_fn(mistake_rate, rng=random):
+    def decision_fn(hand, trump):
+        recommended = recommend_discard(hand, trump)
+        alternatives = [c for c in hand if c != recommended]
+        return apply_mistake(recommended, alternatives, mistake_rate, rng)
+    return decision_fn
