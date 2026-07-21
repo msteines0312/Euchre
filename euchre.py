@@ -295,3 +295,57 @@ def make_ai_discard_decision_fn(mistake_rate, rng=random):
         alternatives = [c for c in hand if c != recommended]
         return apply_mistake(recommended, alternatives, mistake_rate, rng)
     return decision_fn
+
+
+# --- Human decision functions (terminal I/O + oracle logging) ---------------
+
+def _prompt_choice(prompt, valid_choices):
+    while True:
+        raw = input(prompt).strip()
+        if raw in valid_choices:
+            return raw
+        print(f"Please enter one of: {', '.join(valid_choices)}")
+
+
+def make_human_bid_decision_fn(decisions_log):
+    def decision_fn(hand, turned_suit_or_available, must_call=False):
+        print(f"Your hand: {hand}")
+        if isinstance(turned_suit_or_available, list):
+            recommended = recommend_bid_action(
+                hand, round_num=2, is_dealer=must_call, available_suits=turned_suit_or_available
+            )
+            choices = turned_suit_or_available + (["pass"] if not must_call else [])
+            raw = _prompt_choice(f"Call a suit ({', '.join(choices)}) or pass: ", choices)
+            actual = "pass" if raw == "pass" else (raw, False)
+        else:
+            recommended = recommend_bid_action(hand, round_num=1, is_dealer=False, turned_suit=turned_suit_or_available)
+            raw = _prompt_choice("Order it up, go alone, or pass? (order_up/order_up_alone/pass): ",
+                                  ["order_up", "order_up_alone", "pass"])
+            actual = raw
+        decisions_log.append((actual, recommended))
+        return actual
+    return decision_fn
+
+
+def make_human_card_decision_fn(decisions_log):
+    def decision_fn(hand, trick_so_far, trump, led_suit):
+        recommended = recommend_card_play(hand, trick_so_far, trump, led_suit)
+        options = legal_plays(hand, led_suit, trump)
+        print(f"Your hand: {hand}")
+        print(f"Legal plays: {options}")
+        raw = input("Play a card (rank suit): ").strip().split()
+        actual = (raw[0], raw[1])
+        decisions_log.append((actual, recommended))
+        return actual
+    return decision_fn
+
+
+def make_human_discard_decision_fn(decisions_log):
+    def decision_fn(hand, trump):
+        recommended = recommend_discard(hand, trump)
+        print(f"Your hand after picking up the up-card: {hand}")
+        raw = input("Discard a card (rank suit): ").strip().split()
+        actual = (raw[0], raw[1])
+        decisions_log.append((actual, recommended))
+        return actual
+    return decision_fn

@@ -382,3 +382,36 @@ def test_ai_discard_decision_fn_applies_mistake_when_rolled():
     # produces a DIFFERENT card from hand, not the recommendation
     assert result != ("9", "Hearts")
     assert result in hand
+
+
+def test_human_bid_decision_fn_round1_logs_recommendation(monkeypatch):
+    from euchre import make_human_bid_decision_fn
+    decisions_log = []
+    monkeypatch.setattr("builtins.input", lambda prompt="": "pass")
+    decision_fn = make_human_bid_decision_fn(decisions_log)
+    weak_hand = [("9", "Hearts"), ("10", "Diamonds"), ("Q", "Clubs"), ("9", "Diamonds"), ("K", "Hearts")]
+    result = decision_fn(weak_hand, "Spades")
+    assert result == "pass"
+    assert decisions_log == [("pass", "pass")]
+
+
+def test_human_card_decision_fn_logs_recommendation(monkeypatch):
+    from euchre import make_human_card_decision_fn
+    decisions_log = []
+    hand = [("9", "Spades"), ("A", "Spades")]
+    monkeypatch.setattr("builtins.input", lambda prompt="": "A Spades")
+    decision_fn = make_human_card_decision_fn(decisions_log)
+    result = decision_fn(hand, [], "Spades", None)
+    assert result == ("A", "Spades")
+    assert decisions_log == [(("A", "Spades"), ("A", "Spades"))]
+
+
+def test_human_discard_decision_fn_logs_recommendation(monkeypatch):
+    from euchre import make_human_discard_decision_fn
+    decisions_log = []
+    hand = [("9", "Hearts"), ("A", "Spades"), ("J", "Spades"), ("Q", "Diamonds"), ("K", "Clubs"), ("10", "Hearts")]
+    monkeypatch.setattr("builtins.input", lambda prompt="": "9 Hearts")
+    decision_fn = make_human_discard_decision_fn(decisions_log)
+    result = decision_fn(hand, trump="Spades")
+    assert result == ("9", "Hearts")
+    assert decisions_log == [(("9", "Hearts"), ("9", "Hearts"))]
