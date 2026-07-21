@@ -100,6 +100,8 @@ def recommend_bid_action(hand, round_num, is_dealer, turned_suit=None, available
             best_suit, best_strength = suit, strength
     if best_strength >= ALONE_THRESHOLD:
         return (best_suit, True)
+    # is_dealer means "stuck the dealer": round 2 forces a call, so a weak
+    # hand still calls the best available suit rather than passing.
     if best_strength >= ORDER_UP_THRESHOLD or is_dealer:
         return (best_suit, False)
     return "pass"
