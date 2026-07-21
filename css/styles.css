@@ -25,6 +25,22 @@
   --font-body: "Nunito", ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Bar-table theme: swaps the felt/casino palette for a warm wood-and-brass
+   "game night with friends" look. Everything downstream reads these same
+   custom properties, so no other rule needs to know which theme is active. */
+body[data-theme="bar"] {
+  --bg-deep: #140d09;
+  --felt-1: #2a170c;
+  --felt-2: #3c2210;
+  --felt-3: #55321a;
+  --gold: #b5651d;
+  --gold-light: #dc9a4e;
+  --gold-soft: rgba(220, 154, 78, 0.18);
+  --surface: #241a12;
+  --surface-2: #2d2015;
+  --border: rgba(255, 220, 180, 0.1);
+}
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -38,6 +54,16 @@ body {
   background: radial-gradient(ellipse at 50% -10%, #16324a 0%, var(--bg-deep) 55%);
   min-height: 100dvh;
   overflow-x: hidden;
+  transition: background var(--dur-med) var(--ease-out);
+}
+
+/* Warm string-light bokeh glow instead of the cool casino-room backdrop. */
+body[data-theme="bar"] {
+  background:
+    radial-gradient(circle at 14% 18%, rgba(220, 154, 78, 0.22) 0%, transparent 38%),
+    radial-gradient(circle at 86% 14%, rgba(220, 154, 78, 0.16) 0%, transparent 34%),
+    radial-gradient(circle at 50% 85%, rgba(181, 101, 29, 0.14) 0%, transparent 46%),
+    radial-gradient(ellipse at 50% -10%, #3a2414 0%, var(--bg-deep) 55%);
 }
 
 button {
@@ -86,6 +112,15 @@ button {
     inset 0 0 60px rgba(0, 0, 0, 0.4),
     0 20px 60px rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(0, 0, 0, 0.4);
+  transition: background var(--dur-med) var(--ease-out);
+}
+
+/* Wood-plank grain over the same base gradient, for the bar-table theme. */
+body[data-theme="bar"] .table {
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.12) 0px, rgba(0, 0, 0, 0.12) 2px, transparent 2px, transparent 84px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.06) 0px, transparent 3px, transparent 6px),
+    radial-gradient(ellipse 90% 70% at 50% 42%, var(--felt-3) 0%, var(--felt-2) 55%, var(--felt-1) 100%);
 }
 
 /* ===== HUD ================================================================ */
@@ -334,7 +369,7 @@ button {
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out);
-  z-index: 20;
+  z-index: 60;
   max-width: 90%;
   text-align: center;
 }

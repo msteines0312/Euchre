@@ -139,25 +139,10 @@ function isLegalPlay(card, hand, ledSuit, trump) {
   return legalPlays(hand, ledSuit, trump).some((c) => cardsEqual(c, card));
 }
 
-function recommendCardPlay(hand, trickSoFar, trump, ledSuit) {
-  const options = legalPlays(hand, ledSuit, trump);
-  if (ledSuit === null) {
-    return options.reduce((best, c) => (cardStrength(c, trump) > cardStrength(best, trump) ? c : best));
-  }
-  let winningOptions = options;
-  if (trickSoFar.length) {
-    const bestPlayed = Math.max(...trickSoFar.map((c) => cardStrength(c, trump)));
-    winningOptions = options.filter((c) => cardStrength(c, trump) > bestPlayed);
-  }
-  const pool = winningOptions.length ? winningOptions : options;
-  return pool.reduce((best, c) => (cardStrength(c, trump) < cardStrength(best, trump) ? c : best));
-}
-
-// --- Trick orchestration --------------------------------------------------
-
-// plays: array of {seat, card} in play order.
-function determineTrickWinner(plays, trump) {
-  const ledSuit = effectiveSuit(plays[0].card, trump);
+// plays: array of {seat, card} played so far this trick, in play order.
+// Returns the seat currently holding the best card, or null if plays is empty.
+function currentTrickLeader(plays, trump, ledSuit) {
+  if (!plays.length) return null;
   function rank(play) {
     const card = play.card;
     if (effectiveSuit(card, trump) === trump) return [2, cardStrength(card, trump)];
@@ -174,6 +159,38 @@ function determineTrickWinner(plays, trump) {
     }
   }
   return winner.seat;
+}
+
+// trickPlays: array of {seat, card} already played this trick (not including `seat`).
+// seat: the seat about to play (needed to tell a winning partner from a winning opponent).
+function recommendCardPlay(hand, trickPlays, trump, ledSuit, seat = null) {
+  const options = legalPlays(hand, ledSuit, trump);
+  if (ledSuit === null) {
+    return options.reduce((best, c) => (cardStrength(c, trump) > cardStrength(best, trump) ? c : best));
+  }
+
+  const leaderSeat = currentTrickLeader(trickPlays, trump, ledSuit);
+  const partnerIsWinning = leaderSeat !== null && seat !== null && TEAM_OF_SEAT[leaderSeat] === TEAM_OF_SEAT[seat];
+  if (partnerIsWinning) {
+    // Your partner already holds the best card -- don't waste strength beating your own team.
+    return options.reduce((worst, c) => (cardStrength(c, trump) < cardStrength(worst, trump) ? c : worst));
+  }
+
+  let winningOptions = options;
+  if (trickPlays.length) {
+    const bestPlayed = Math.max(...trickPlays.map((p) => cardStrength(p.card, trump)));
+    winningOptions = options.filter((c) => cardStrength(c, trump) > bestPlayed);
+  }
+  const pool = winningOptions.length ? winningOptions : options;
+  return pool.reduce((best, c) => (cardStrength(c, trump) < cardStrength(best, trump) ? c : best));
+}
+
+// --- Trick orchestration --------------------------------------------------
+
+// plays: array of {seat, card} in play order.
+function determineTrickWinner(plays, trump) {
+  const ledSuit = effectiveSuit(plays[0].card, trump);
+  return currentTrickLeader(plays, trump, ledSuit);
 }
 
 // --- Scoring ---------------------------------------------------------------
@@ -212,6 +229,7 @@ export {
   legalPlays,
   isLegalPlay,
   recommendCardPlay,
+  currentTrickLeader,
   determineTrickWinner,
   scoreHand,
 };
