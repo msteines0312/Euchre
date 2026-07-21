@@ -1,4 +1,4 @@
-from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand, recommend_bid_action, recommend_discard
+from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand, recommend_bid_action, recommend_discard, run_round1_bidding, run_round2_bidding
 
 def test_deal_hands_gives_four_five_card_hands():
     deck = create_deck()
@@ -107,3 +107,50 @@ def test_recommend_bid_action_forces_call_when_dealer_stuck():
     forced_result = recommend_bid_action(weak_hand, round_num=2, is_dealer=True, available_suits=available_suits)
     assert forced_result != "pass"
     assert forced_result[1] is False  # not alone -- hand isn't strong enough for that
+
+def test_round1_bidding_returns_first_non_pass():
+    hands = [[], [], [], []]
+    decisions = ["pass", "order_up", "pass", "pass"]
+    decision_fns = [lambda h, s, d=d: d for d in decisions]
+    result = run_round1_bidding(hands, "Spades", dealer_seat=0, decision_fns=decision_fns)
+    assert result == (1, False)
+
+def test_round1_bidding_returns_none_if_all_pass():
+    hands = [[], [], [], []]
+    decision_fns = [lambda h, s: "pass" for _ in range(4)]
+    result = run_round1_bidding(hands, "Spades", dealer_seat=0, decision_fns=decision_fns)
+    assert result is None
+
+def test_round1_bidding_starts_left_of_dealer():
+    hands = [[], [], [], []]
+    order_seen = []
+    def make_fn(seat):
+        def fn(hand, turned_suit):
+            order_seen.append(seat)
+            return "pass"
+        return fn
+    decision_fns = [make_fn(seat) for seat in range(4)]
+    run_round1_bidding(hands, "Spades", dealer_seat=1, decision_fns=decision_fns)
+    assert order_seen == [2, 3, 0, 1]
+
+def test_round2_bidding_returns_maker_suit_and_alone():
+    hands = [[], [], [], []]
+    decisions = ["pass", ("Hearts", True), "pass", "pass"]
+    decision_fns = [lambda h, s, m, d=d: d for d in decisions]
+    result = run_round2_bidding(hands, "Spades", dealer_seat=0, decision_fns=decision_fns, stick_the_dealer=False)
+    assert result == (1, "Hearts", True)
+
+def test_round2_bidding_returns_none_when_all_pass_and_no_stick_the_dealer():
+    hands = [[], [], [], []]
+    decision_fns = [lambda h, s, m: "pass" for _ in range(4)]
+    result = run_round2_bidding(hands, "Spades", dealer_seat=0, decision_fns=decision_fns, stick_the_dealer=False)
+    assert result is None
+
+def test_round2_bidding_forces_dealer_call_when_stick_the_dealer():
+    hands = [[], [], [], []]
+    def dealer_fn(hand, available_suits, must_call):
+        assert must_call is True
+        return ("Hearts", False)
+    decision_fns = [lambda h, s, m: "pass", lambda h, s, m: "pass", lambda h, s, m: "pass", dealer_fn]
+    result = run_round2_bidding(hands, "Spades", dealer_seat=3, decision_fns=decision_fns, stick_the_dealer=True)
+    assert result == (3, "Hearts", False)

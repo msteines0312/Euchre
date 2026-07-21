@@ -109,3 +109,29 @@ def recommend_bid_action(hand, round_num, is_dealer, turned_suit=None, available
 
 def recommend_discard(hand, trump):
     return min(hand, key=lambda c: card_strength(c, trump))
+
+
+# --- Bidding orchestration --------------------------------------------------
+
+def run_round1_bidding(hands, turned_suit, dealer_seat, decision_fns):
+    for offset in range(1, 5):
+        seat = (dealer_seat + offset) % 4
+        action = decision_fns[seat](hands[seat], turned_suit)
+        if action == "order_up":
+            return seat, False
+        if action == "order_up_alone":
+            return seat, True
+    return None
+
+
+def run_round2_bidding(hands, turned_suit, dealer_seat, decision_fns, stick_the_dealer):
+    available_suits = [suit for suit in SUITS if suit != turned_suit]
+    for offset in range(1, 5):
+        seat = (dealer_seat + offset) % 4
+        is_dealer_seat = seat == dealer_seat
+        must_call = stick_the_dealer and is_dealer_seat
+        action = decision_fns[seat](hands[seat], available_suits, must_call)
+        if action != "pass":
+            suit, alone = action
+            return seat, suit, alone
+    return None
