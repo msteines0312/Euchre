@@ -135,3 +135,32 @@ def run_round2_bidding(hands, turned_suit, dealer_seat, decision_fns, stick_the_
             suit, alone = action
             return seat, suit, alone
     return None
+
+
+# --- Card-play legality and AI heuristic ------------------------------------
+
+def legal_plays(hand, led_suit, trump):
+    if led_suit is None:
+        return hand[:]
+    following = [c for c in hand if effective_suit(c, trump) == led_suit]
+    return following if following else hand[:]
+
+
+def is_legal_play(card, hand, led_suit, trump):
+    return card in legal_plays(hand, led_suit, trump)
+
+
+def recommend_card_play(hand, trick_so_far, trump, led_suit):
+    options = legal_plays(hand, led_suit, trump)
+    if led_suit is None:
+        return max(options, key=lambda c: card_strength(c, trump))
+
+    if trick_so_far:
+        best_played_strength = max(card_strength(c, trump) for c in trick_so_far)
+        winning_options = [c for c in options if card_strength(c, trump) > best_played_strength]
+    else:
+        winning_options = options
+
+    if winning_options:
+        return min(winning_options, key=lambda c: card_strength(c, trump))
+    return min(options, key=lambda c: card_strength(c, trump))

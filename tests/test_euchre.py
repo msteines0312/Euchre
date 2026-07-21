@@ -1,4 +1,4 @@
-from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand, recommend_bid_action, recommend_discard, run_round1_bidding, run_round2_bidding
+from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand, recommend_bid_action, recommend_discard, run_round1_bidding, run_round2_bidding, legal_plays, is_legal_play, recommend_card_play
 
 def test_deal_hands_gives_four_five_card_hands():
     deck = create_deck()
@@ -154,3 +154,42 @@ def test_round2_bidding_forces_dealer_call_when_stick_the_dealer():
     decision_fns = [lambda h, s, m: "pass", lambda h, s, m: "pass", lambda h, s, m: "pass", dealer_fn]
     result = run_round2_bidding(hands, "Spades", dealer_seat=3, decision_fns=decision_fns, stick_the_dealer=True)
     assert result == (3, "Hearts", False)
+
+def test_legal_plays_when_leading_is_full_hand():
+    hand = [("9", "Hearts"), ("A", "Spades")]
+    assert legal_plays(hand, led_suit=None, trump="Clubs") == hand
+
+def test_legal_plays_must_follow_suit_if_possible():
+    hand = [("9", "Hearts"), ("A", "Spades"), ("K", "Hearts")]
+    result = legal_plays(hand, led_suit="Hearts", trump="Clubs")
+    assert result == [("9", "Hearts"), ("K", "Hearts")]
+
+def test_legal_plays_left_bower_counts_as_trump_for_following():
+    hand = [("J", "Hearts"), ("9", "Spades")]  # trump is Diamonds, Hearts is same color
+    result = legal_plays(hand, led_suit="Diamonds", trump="Diamonds")
+    assert result == [("J", "Hearts")]
+
+def test_legal_plays_any_card_if_cannot_follow_suit():
+    hand = [("9", "Spades"), ("K", "Clubs")]
+    result = legal_plays(hand, led_suit="Hearts", trump="Diamonds")
+    assert result == hand
+
+def test_is_legal_play_true_and_false():
+    hand = [("9", "Hearts"), ("A", "Spades")]
+    assert is_legal_play(("9", "Hearts"), hand, led_suit="Hearts", trump="Clubs") is True
+    assert is_legal_play(("A", "Spades"), hand, led_suit="Hearts", trump="Clubs") is False
+
+def test_recommend_card_play_leads_highest_when_leading():
+    hand = [("9", "Spades"), ("A", "Spades")]
+    result = recommend_card_play(hand, trick_so_far=[], trump="Spades", led_suit=None)
+    assert result == ("A", "Spades")
+
+def test_recommend_card_play_wins_as_cheaply_as_possible():
+    hand = [("9", "Hearts"), ("A", "Hearts")]
+    result = recommend_card_play(hand, trick_so_far=[("10", "Hearts")], trump="Spades", led_suit="Hearts")
+    assert result == ("A", "Hearts")
+
+def test_recommend_card_play_throws_lowest_when_cannot_win():
+    hand = [("9", "Hearts"), ("10", "Hearts")]
+    result = recommend_card_play(hand, trick_so_far=[("A", "Hearts")], trump="Spades", led_suit="Hearts")
+    assert result == ("9", "Hearts")
