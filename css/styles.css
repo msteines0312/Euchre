@@ -171,6 +171,7 @@ button {
 .seat-bottom { grid-area: bot; z-index: 5; }
 
 .nameplate {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -181,6 +182,17 @@ button {
   font-size: 12px;
 }
 .nameplate .name { font-weight: 700; color: var(--text); }
+.role-tag {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.role-tag.role-partner { background: var(--gold-soft); color: var(--gold-light); }
+.role-tag.role-opponent { background: rgba(229, 72, 77, 0.16); color: #ff9b9e; }
 .tricks-pill {
   min-width: 16px;
   text-align: center;
@@ -346,6 +358,21 @@ button {
 .overlay.hidden { display: none; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+/* Used for in-the-moment decisions (order up / call trump) so the table and
+   your own hand stay visible and un-blurred underneath while you decide. */
+.overlay-transparent {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  align-items: flex-start;
+  padding-top: clamp(64px, 14vh, 120px);
+  pointer-events: none;
+}
+.overlay-transparent .overlay-panel {
+  pointer-events: auto;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
 .overlay-panel {
   width: min(460px, 100%);
   max-height: 88dvh;
@@ -375,6 +402,35 @@ button {
 .logo { font-family: var(--font-display); font-size: clamp(38px, 8vw, 56px); margin: 6px 0 4px; }
 .logo-dot { color: var(--gold-light); }
 .tagline { color: var(--text-muted); margin: 0 0 20px; font-size: 15px; }
+
+.name-field { text-align: left; margin-bottom: 20px; }
+.name-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.name-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+.name-input::placeholder { color: var(--text-muted); }
+.name-input:focus-visible, .name-input:focus {
+  outline: none;
+  border-color: var(--gold-light);
+  box-shadow: 0 0 0 3px var(--gold-soft);
+}
 
 .start-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 22px; }
 .stat-card {
@@ -429,6 +485,22 @@ button {
 .bid-upcard .card { --card-w: 84px; --card-h: 118px; }
 .bid-prompt { color: var(--text-muted); font-size: 14px; margin: 0 0 14px; }
 .bid-prompt.subtle { font-size: 13px; }
+
+.bid-turned-down {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 4px 0 12px;
+}
+.bid-turned-down .card { --card-w: 52px; --card-h: 72px; opacity: 0.55; filter: grayscale(0.5) drop-shadow(0 3px 5px rgba(0, 0, 0, 0.4)); }
+.bid-turned-down .turned-down-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
 
 .suit-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
 .difficulty-grid { grid-template-columns: repeat(2, 1fr); }
@@ -505,6 +577,83 @@ button {
 .switch input:checked + .slider::before { transform: translateX(18px); }
 .switch input:focus-visible + .slider { outline: 2px solid var(--gold-light); outline-offset: 2px; }
 
+/* ===== Hint FAB ============================================================= */
+
+.hint-fab.hidden { display: none; }
+.hint-fab {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 55;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold));
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  color: #241a05;
+  box-shadow: 0 8px 22px rgba(217, 119, 6, 0.45);
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+  animation: hintFabIdle 2.6s ease-in-out infinite;
+}
+.hint-fab .icon { width: 26px; height: 26px; fill: currentColor; }
+.hint-fab:hover { transform: scale(1.06); }
+.hint-fab:active { transform: scale(0.94); }
+.hint-fab:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+
+@keyframes hintFabIdle {
+  0%, 100% { box-shadow: 0 8px 22px rgba(217, 119, 6, 0.45); }
+  50% { box-shadow: 0 8px 26px rgba(217, 119, 6, 0.7); }
+}
+
+/* Applied to whatever button/card the hint points at. Uses outline (not
+   box-shadow) so it doesn't fight with existing button/card shadows. */
+.hint-pulse {
+  animation: hintPulse 1s ease-in-out 2;
+  border-radius: inherit;
+}
+@keyframes hintPulse {
+  0%, 100% { outline: 3px solid transparent; outline-offset: 3px; }
+  50% { outline: 3px solid var(--gold-light); outline-offset: 5px; }
+}
+
+/* ===== Knock (pass) animation =============================================== */
+
+.nameplate.knocking { animation: knockThump 420ms var(--ease-out); }
+@keyframes knockThump {
+  0% { transform: scale(1); }
+  30% { transform: scale(0.92) translateY(2px); }
+  60% { transform: scale(1.06) translateY(-2px); }
+  100% { transform: scale(1); }
+}
+
+.knock-fist {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  margin-bottom: 2px;
+  width: 26px;
+  height: 26px;
+  display: block;
+  color: var(--gold-light);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 6px) scale(0.7);
+  animation: knockFist 750ms ease-out forwards;
+}
+.fist-icon { width: 100%; height: 100%; fill: currentColor; }
+@keyframes knockFist {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(0.7); }
+  14% { opacity: 1; transform: translate(-50%, -6px) scale(1); }
+  30% { transform: translate(-50%, 6px) scale(0.94); }
+  46% { transform: translate(-50%, -6px) scale(1); }
+  62% { transform: translate(-50%, 6px) scale(0.94); }
+  78% { opacity: 1; transform: translate(-50%, -6px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -10px) scale(0.9); }
+}
+
 /* ===== Responsive ========================================================== */
 
 @media (max-width: 720px) {
@@ -515,6 +664,7 @@ button {
   .trick-slot { --card-w: 44px; --card-h: 62px; }
   .upcard-holder { --card-w: 46px; --card-h: 64px; }
   .name { display: none; }
+  .role-tag { display: none; }
   .table { grid-template-columns: 46px 1fr 46px; padding: 10px 4px 14px; gap: 4px 4px; }
   .score-chip { min-width: 40px; padding: 3px 6px; }
   .score-chip-value { font-size: 16px; }

@@ -1,6 +1,10 @@
 // AI decision-making: wraps the "recommended" heuristics from engine.js with a
 // tunable mistake rate, and tracks a persistent MMR/difficulty rating in
 // localStorage (a browser stand-in for euchre.py's mmr.json).
+//
+// MMR is stored as a single "table" keyed by player name, so the same browser
+// can hold separate profiles for each name typed into the name field —
+// entering a name looks up (or creates) that name's own MMR record.
 
 import {
   recommendBidAction,
@@ -14,24 +18,40 @@ const MISTAKE_RATES = { easy: 0.3, medium: 0.15, hard: 0.0 };
 const K = 20;
 const BASELINE = 0.6;
 const DEFAULT_MMR = { mmr: 1000, gamesPlayed: 0 };
-const STORAGE_KEY = "euchre-mmr-v1";
+const PLAYERS_TABLE_KEY = "euchre-players-v1";
 
-function loadMmr() {
+function normalizePlayerKey(name) {
+  return name.trim().toLowerCase();
+}
+
+function loadPlayersTable() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_MMR };
-    return { ...DEFAULT_MMR, ...JSON.parse(raw) };
+    const raw = localStorage.getItem(PLAYERS_TABLE_KEY);
+    return raw ? JSON.parse(raw) : {};
   } catch {
-    return { ...DEFAULT_MMR };
+    return {};
   }
 }
 
-function saveMmr(data) {
+function savePlayersTable(table) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(PLAYERS_TABLE_KEY, JSON.stringify(table));
   } catch {
     // localStorage unavailable (private browsing, etc.) — silently skip persistence.
   }
+}
+
+// Looks up `name`'s MMR record, creating a fresh default one if this is a new name.
+function loadMmr(name) {
+  const table = loadPlayersTable();
+  const record = table[normalizePlayerKey(name)];
+  return record ? { ...DEFAULT_MMR, ...record } : { ...DEFAULT_MMR };
+}
+
+function saveMmr(name, data) {
+  const table = loadPlayersTable();
+  table[normalizePlayerKey(name)] = data;
+  savePlayersTable(table);
 }
 
 function computeQualityRate(decisionsLog) {

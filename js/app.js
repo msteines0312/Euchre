@@ -9,14 +9,21 @@ import { renderCard } from "./cards.js";
 
 const $ = (id) => document.getElementById(id);
 
-const SEAT_NAMES = { 0: "You", 1: "East", 2: "North", 3: "West" };
+const SEAT_NAMES = { 0: "You", 1: "Player 2", 2: "Player 3", 3: "Player 4" };
+const AI_NAME_POOL = ["Riley", "Jordan", "Casey", "Morgan", "Taylor", "Avery", "Quinn", "Drew", "Reese", "Sasha", "Clayton", "Haley"];
+const PLAYER_NAME_KEY = "euchre-player-name-v1";
 const HAND_EL = { 0: $("hand-0"), 1: $("hand-1"), 2: $("hand-2"), 3: $("hand-3") };
 const TRICKS_PILL = { 0: $("tricks-0"), 1: $("tricks-1"), 2: $("tricks-2"), 3: $("tricks-3") };
 const TRICK_SLOT = { 0: $("trick-0"), 1: $("trick-1"), 2: $("trick-2"), 3: $("trick-3") };
 
+function knockVerb(seat) {
+  return seat === 0 ? "knock" : "knocks";
+}
+
 const rules = { ...E.DEFAULT_RULES };
 let difficultyOverride = "auto";
-let mmrData = AI.loadMmr();
+let currentPlayerName = "Player";
+let mmrData = { mmr: 1000, gamesPlayed: 0 };
 let decisionsLog = [];
 let scores = { 0: 0, 1: 0 };
 let dealerSeat = 0;
@@ -43,6 +50,38 @@ function aiFns() {
   };
 }
 
+// ===== Player identity + AI names ==========================================
+
+function loadPlayerName() {
+  try {
+    return localStorage.getItem(PLAYER_NAME_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function savePlayerName(name) {
+  try {
+    localStorage.setItem(PLAYER_NAME_KEY, name);
+  } catch {
+    // localStorage unavailable (private browsing, etc.) — name just won't persist.
+  }
+}
+
+function setSeatName(seat, name) {
+  SEAT_NAMES[seat] = name;
+  const nameEl = document.querySelector(`#seat-${seat} .nameplate .name`);
+  if (nameEl) nameEl.textContent = name;
+}
+
+// Gives each AI seat a real (non-directional) name, freshly picked every game.
+function assignAiNames() {
+  const picks = E.shuffle(AI_NAME_POOL).slice(0, 3);
+  setSeatName(1, picks[0]);
+  setSeatName(2, picks[1]);
+  setSeatName(3, picks[2]);
+}
+
 // ===== Toast / small messaging ============================================
 
 let toastTimer = null;
@@ -55,6 +94,70 @@ function showToast(message, duration = 1800) {
 }
 function hideToast() {
   $("toast").classList.remove("show");
+}
+
+// ===== Hint helper ==========================================================
+// currentHint holds {text, selector} for whatever human decision is pending.
+// selector is resolved lazily (at hint-button click time) so it still finds
+// the right element even after the overlay/hand has re-rendered.
+
+let currentHint = null;
+
+function cardLabel(card) {
+  return `${card[0]} of ${card[1]}`;
+}
+
+function cardSelector(containerId, card) {
+  return `#${containerId} .card[data-rank="${card[0]}"][data-suit="${card[1]}"]`;
+}
+
+function setHint(hint) {
+  currentHint = hint;
+}
+
+function clearHint() {
+  currentHint = null;
+}
+
+function showHint() {
+  if (!currentHint) {
+    showToast("Nothing to decide right now — sit tight.", 1800);
+    return;
+  }
+  showToast(currentHint.text, 3200);
+  if (currentHint.selector) {
+    const el = document.querySelector(currentHint.selector);
+    if (el) {
+      el.classList.remove("hint-pulse");
+      void el.offsetWidth; // restart the animation if the hint is requested twice
+      el.classList.add("hint-pulse");
+      setTimeout(() => el.classList.remove("hint-pulse"), 2200);
+    }
+  }
+}
+
+// ===== Knock (pass) animation ==============================================
+
+const FIST_SVG = `<svg viewBox="0 0 24 24" class="fist-icon">
+  <rect x="5" y="10" width="14" height="9" rx="4.5" />
+  <rect x="6.5" y="5.5" width="3.4" height="6.5" rx="1.7" />
+  <rect x="10.3" y="4.3" width="3.4" height="6.5" rx="1.7" />
+  <rect x="14.1" y="4.3" width="3.4" height="6.5" rx="1.7" />
+  <rect x="17.6" y="5.8" width="2.6" height="6" rx="1.3" />
+</svg>`;
+
+function showKnock(seat) {
+  const nameplate = document.querySelector(`#seat-${seat} .nameplate`);
+  if (!nameplate) return;
+  nameplate.classList.remove("knocking");
+  void nameplate.offsetWidth;
+  nameplate.classList.add("knocking");
+  const fist = document.createElement("span");
+  fist.className = "knock-fist";
+  fist.innerHTML = FIST_SVG;
+  nameplate.appendChild(fist);
+  setTimeout(() => nameplate.classList.remove("knocking"), 450);
+  setTimeout(() => fist.remove(), 750);
 }
 
 // ===== Rendering helpers ===================================================
@@ -183,6 +286,14 @@ async function showBid2Modal(availableSuits, mustCall) {
   const aloneCheck = $("bid2-alone-check");
   aloneCheck.checked = false;
   passBtn.style.display = mustCall ? "none" : "";
+
+  const turnedDownEl = $("bid2-turned-down");
+  clearEl(turnedDownEl);
+  turnedDownEl.appendChild(renderCard(upCard, {}));
+  const label = document.createElement("span");
+  label.className = "turned-down-label";
+  label.textContent = "Turned down";
+  turnedDownEl.appendChild(label);
   $("bid2-prompt").textContent = mustCall
     ? "You're stuck! You must name a suit."
     : "Call any suit other than the turned-down suit.";
@@ -199,6 +310,7 @@ async function showBid2Modal(availableSuits, mustCall) {
     for (const suit of availableSuits) {
       const btn = document.createElement("button");
       btn.className = "suit-btn";
+      btn.dataset.suit = suit;
       btn.innerHTML = `<span class="${trumpSuitClass(suit)}">${E.SUIT_SYMBOL[suit]}</span> ${suit}`;
       const onClick = () => {
         const alone = rules.allowGoingAlone && aloneCheck.checked;
@@ -301,15 +413,62 @@ async function offerFarmersHandSwaps() {
 
 // ===== Bidding =============================================================
 
+// Counts trump cards in `hand` under `trump` and notes whether either bower
+// is among them, so hint text can explain *why* a call is recommended.
+function trumpCountAndBowers(hand, trump) {
+  let count = 0;
+  let hasRight = false;
+  let hasLeft = false;
+  for (const card of hand) {
+    if (E.effectiveSuit(card, trump) !== trump) continue;
+    count++;
+    if (card[0] === "J" && card[1] === trump) hasRight = true;
+    if (card[0] === "J" && E.SAME_COLOR[card[1]] === trump) hasLeft = true;
+  }
+  return { count, hasRight, hasLeft };
+}
+
+function bowerClause(hasRight, hasLeft) {
+  if (hasRight && hasLeft) return ", including both bowers";
+  if (hasRight) return ", including the right bower";
+  if (hasLeft) return ", including the left bower";
+  return "";
+}
+
+function bid1Hint(hand, turnedSuit, recommended) {
+  const { count, hasRight, hasLeft } = trumpCountAndBowers(hand, turnedSuit);
+  const bowerNote = bowerClause(hasRight, hasLeft);
+  const plural = count === 1 ? "" : "s";
+  if (recommended === "order_up_alone") {
+    return {
+      text: `Go alone — you're holding ${count} trump card${plural}${bowerNote}, more than enough to handle without help.`,
+      selector: "#bid1-alone-btn",
+    };
+  }
+  if (recommended === "order_up") {
+    return {
+      text: `Order it up — ${count} trump card${plural}${bowerNote} gives you solid control of this hand.`,
+      selector: "#bid1-order-btn",
+    };
+  }
+  return {
+    text: `Pass — only ${count} trump card${plural} here isn't enough to safely pick this up.`,
+    selector: "#bid1-pass-btn",
+  };
+}
+
 async function getHumanBidRound1(hand, turnedSuit) {
   const recommended = E.recommendBidAction(hand, { roundNum: 1, isDealer: false, turnedSuit });
+  setHint(bid1Hint(hand, turnedSuit, recommended));
   const actual = await showBid1Modal(upCard);
+  clearHint();
   decisionsLog.push([actual, recommended]);
   return actual;
 }
 
-async function getAiBidRound1(hand, turnedSuit) {
-  await sleep(650 + Math.random() * 400);
+async function getAiBidRound1(seat, hand, turnedSuit) {
+  showToast(`${SEAT_NAMES[seat]} is deciding...`, 0);
+  await sleep(900 + Math.random() * 500);
   let action = aiFns().bid(hand, { roundNum: 1, turnedSuit });
   if (action === "order_up_alone" && !rules.allowGoingAlone) action = "order_up";
   return action;
@@ -318,9 +477,11 @@ async function getAiBidRound1(hand, turnedSuit) {
 async function runRound1Bidding(turnedSuit) {
   for (let offset = 1; offset <= 4; offset++) {
     const seat = (dealerSeat + offset) % 4;
-    const action = seat === 0 ? await getHumanBidRound1(hands[seat], turnedSuit) : await getAiBidRound1(hands[seat], turnedSuit);
+    const action = seat === 0 ? await getHumanBidRound1(hands[seat], turnedSuit) : await getAiBidRound1(seat, hands[seat], turnedSuit);
     if (action === "pass") {
-      showToast(`${SEAT_NAMES[seat]} passes.`);
+      showToast(`${SEAT_NAMES[seat]} ${knockVerb(seat)}.`, 1300);
+      showKnock(seat);
+      await sleep(1300);
       continue;
     }
     return { seat, alone: action === "order_up_alone" };
@@ -328,17 +489,39 @@ async function runRound1Bidding(turnedSuit) {
   return null;
 }
 
+function bid2Hint(hand, recommended) {
+  if (recommended === "pass") {
+    return {
+      text: "Pass — none of the remaining suits give you enough trump to make a call worthwhile.",
+      selector: "#bid2-pass-btn",
+    };
+  }
+  const { count, hasRight, hasLeft } = trumpCountAndBowers(hand, recommended.suit);
+  const bowerNote = bowerClause(hasRight, hasLeft);
+  const plural = count === 1 ? "" : "s";
+  const aloneNote = recommended.alone
+    ? ` That's strong enough to go alone for extra points, too.`
+    : "";
+  return {
+    text: `Call ${recommended.suit} — you hold ${count} trump card${plural}${bowerNote} in that suit.${aloneNote}`,
+    selector: `#bid2-suit-grid .suit-btn[data-suit="${recommended.suit}"]`,
+  };
+}
+
 async function getHumanBidRound2(hand, availableSuits, mustCall) {
   const recommended = E.recommendBidAction(hand, { roundNum: 2, isDealer: mustCall, availableSuits });
+  setHint(bid2Hint(hand, recommended));
   const actual = await showBid2Modal(availableSuits, mustCall);
+  clearHint();
   const normalizedActual = actual === "pass" ? "pass" : `${actual.suit}:${actual.alone}`;
   const normalizedRec = recommended === "pass" ? "pass" : `${recommended.suit}:${recommended.alone}`;
   decisionsLog.push([normalizedActual, normalizedRec]);
   return actual;
 }
 
-async function getAiBidRound2(hand, availableSuits, mustCall) {
-  await sleep(650 + Math.random() * 400);
+async function getAiBidRound2(seat, hand, availableSuits, mustCall) {
+  showToast(`${SEAT_NAMES[seat]} is deciding...`, 0);
+  await sleep(900 + Math.random() * 500);
   let action = aiFns().bid(hand, { roundNum: 2, availableSuits, isDealer: mustCall });
   if (action !== "pass" && action.alone && !rules.allowGoingAlone) action = { ...action, alone: false };
   return action;
@@ -351,9 +534,11 @@ async function runRound2Bidding(turnedSuit) {
     const mustCall = rules.stickTheDealer && seat === dealerSeat;
     const action = seat === 0
       ? await getHumanBidRound2(hands[seat], availableSuits, mustCall)
-      : await getAiBidRound2(hands[seat], availableSuits, mustCall);
+      : await getAiBidRound2(seat, hands[seat], availableSuits, mustCall);
     if (action === "pass") {
-      showToast(`${SEAT_NAMES[seat]} passes.`);
+      showToast(`${SEAT_NAMES[seat]} ${knockVerb(seat)}.`, 1300);
+      showKnock(seat);
+      await sleep(1300);
       continue;
     }
     return { seat, suit: action.suit, alone: action.alone };
@@ -388,6 +573,19 @@ async function sweepTrick(winnerSeat) {
   }
 }
 
+// Explains *why* recommendCardPlay's choice is right for the current trick state.
+function cardPlayWhy(trickCardsSoFar, trump, ledSuit, recommended) {
+  if (ledSuit === null) {
+    return "leading your strongest card here puts pressure on the table early";
+  }
+  const bestPlayed = trickCardsSoFar.length ? Math.max(...trickCardsSoFar.map((c) => E.cardStrength(c, trump))) : -1;
+  const winsIt = E.cardStrength(recommended, trump) > bestPlayed;
+  if (winsIt) {
+    return "it wins the trick while spending as little strength as possible";
+  }
+  return "you can't beat what's on the table, so it's best to save your strong cards and toss this one";
+}
+
 async function playTrick(leaderSeat, trump) {
   let ledSuit = null;
   const plays = [];
@@ -400,8 +598,15 @@ async function playTrick(leaderSeat, trump) {
     let card;
     if (seat === 0) {
       const legal = E.legalPlays(hands[0], ledSuit, trump);
+      const trickCardsSoFar = plays.map((p) => p.card);
+      const recommended = E.recommendCardPlay(hands[0], trickCardsSoFar, trump, ledSuit);
+      setHint({
+        text: `Try the ${cardLabel(recommended)} — ${cardPlayWhy(trickCardsSoFar, trump, ledSuit, recommended)}.`,
+        selector: cardSelector("hand-0", recommended),
+      });
       showToast("Your turn — pick a card.", 0);
       card = await chooseCardFromHand(hands[0], (c) => legal.some((l) => E.cardsEqual(l, c)));
+      clearHint();
       hideToast();
     } else {
       showToast(`${SEAT_NAMES[seat]} is thinking...`, 0);
@@ -431,14 +636,32 @@ async function playHand() {
   let result = await runRound1Bidding(turnedSuit);
   if (result) {
     ({ seat: makerSeat, alone } = result);
-    showToast(`${SEAT_NAMES[makerSeat]} orders it up${alone ? " and goes alone" : ""}!`, 2000);
+    const orderedByDealer = makerSeat === dealerSeat;
+    showToast(`${SEAT_NAMES[makerSeat]} orders it up${alone ? " and goes alone" : ""}!`, 1800);
+    await sleep(1500);
+    if (!orderedByDealer) {
+      showToast(`${SEAT_NAMES[dealerSeat]} picks up the card${dealerSeat === 0 ? " (that's you, dealing)" : ""}...`, 1600);
+      await sleep(1400);
+    }
     hands[dealerSeat] = E.pickUpCard(hands[dealerSeat], upCard);
+    clearEl($("upcard-holder"));
     renderHandsAll();
     if (dealerSeat === 0) {
+      const recommendedDiscard = E.recommendDiscard(hands[0], trump);
+      const isTrump = E.effectiveSuit(recommendedDiscard, trump) === trump;
+      const why = isTrump
+        ? "it's your lowest trump, and you have stronger cards to lean on"
+        : "it's an off-suit card with little chance of ever winning a trick";
+      setHint({
+        text: `Bury the ${cardLabel(recommendedDiscard)} — ${why}.`,
+        selector: cardSelector("discard-hand-cards", recommendedDiscard),
+      });
       const chosen = await showDiscardOverlay(hands[0], trump);
+      clearHint();
       hands[0] = E.discard(hands[0], chosen);
     } else {
-      await sleep(500);
+      showToast(`${SEAT_NAMES[dealerSeat]} buries a card...`, 900);
+      await sleep(900);
       const chosen = aiFns().discard(hands[dealerSeat], trump);
       hands[dealerSeat] = E.discard(hands[dealerSeat], chosen);
     }
@@ -446,7 +669,8 @@ async function playHand() {
     result = await runRound2Bidding(turnedSuit);
     if (!result) return null; // redeal
     ({ seat: makerSeat, suit: trump, alone } = result);
-    showToast(`${SEAT_NAMES[makerSeat]} calls ${trump}${alone ? " and goes alone" : ""}!`, 2000);
+    showToast(`${SEAT_NAMES[makerSeat]} calls ${trump}${alone ? " and goes alone" : ""}!`, 1800);
+    await sleep(1500);
   }
 
   const makingTeam = E.TEAM_OF_SEAT[makerSeat];
@@ -548,7 +772,7 @@ function finishGame() {
   const before = mmrData.mmr;
   mmrData.mmr = AI.updateMmr(mmrData.mmr, qualityRate);
   mmrData.gamesPlayed += 1;
-  AI.saveMmr(mmrData);
+  AI.saveMmr(currentPlayerName, mmrData);
 
   const change = mmrData.mmr - before;
   $("mmr-change").textContent = `${change >= 0 ? "+" : ""}${change}`;
@@ -608,6 +832,7 @@ function wireSettings() {
   $("settings-close-btn").addEventListener("click", () => hideOverlay("settings-overlay"));
   $("rules-btn").addEventListener("click", () => showOverlay("rules-overlay"));
   $("rules-close-btn").addEventListener("click", () => hideOverlay("rules-overlay"));
+  $("hint-btn").addEventListener("click", showHint);
 }
 
 function updateStartStats() {
@@ -616,14 +841,45 @@ function updateStartStats() {
   $("start-games").textContent = mmrData.gamesPlayed;
 }
 
+let gameRunning = false;
+
 function init() {
-  updateStartStats();
-  updateDifficultyChip();
+  if (window.__euchreInitialized) return; // guard against duplicate module execution
+  window.__euchreInitialized = true;
+
   wireSettings();
   window.addEventListener("resize", () => { try { updateDealerChip(); } catch {} });
 
+  const savedName = loadPlayerName();
+  if (savedName) {
+    $("player-name-input").value = savedName;
+    currentPlayerName = savedName;
+    setSeatName(0, savedName);
+    mmrData = AI.loadMmr(savedName);
+  }
+  updateStartStats();
+  updateDifficultyChip();
+
+  // Live-preview whichever name's MMR record is currently typed in, so
+  // switching names on the start screen instantly shows that name's stats.
+  $("player-name-input").addEventListener("input", (e) => {
+    const typed = e.target.value.trim();
+    mmrData = typed ? AI.loadMmr(typed) : { mmr: 1000, gamesPlayed: 0 };
+    updateStartStats();
+    updateDifficultyChip();
+  });
+
   $("new-game-btn").addEventListener("click", () => {
+    if (gameRunning) return;
+    const name = $("player-name-input").value.trim() || "Player";
+    currentPlayerName = name;
+    savePlayerName(name);
+    setSeatName(0, name);
+    mmrData = AI.loadMmr(name);
+    assignAiNames();
+    gameRunning = true;
     hideOverlay("start-overlay");
+    $("hint-btn").classList.remove("hidden");
     runGame();
   });
   $("rematch-btn").addEventListener("click", () => {
