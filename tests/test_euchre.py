@@ -64,6 +64,10 @@ def test_is_farmers_hand_false_with_a_face_card():
     hand = [("9", "Hearts"), ("10", "Hearts"), ("9", "Spades"), ("10", "Spades"), ("J", "Clubs")]
     assert is_farmers_hand(hand) is False
 
+def test_is_farmers_hand_false_for_wrong_size_hand():
+    short_hand = [("9", "Hearts"), ("10", "Hearts"), ("9", "Spades")]
+    assert is_farmers_hand(short_hand) is False
+
 def test_swap_farmers_hand_combines_kept_cards_and_kitty():
     hand = [("9", "Hearts"), ("10", "Hearts"), ("9", "Spades"), ("10", "Spades"), ("9", "Clubs")]
     keep_cards = [("9", "Hearts"), ("10", "Hearts")]

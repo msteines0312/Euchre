@@ -65,7 +65,7 @@ def discard(hand, card_to_discard):
 
 
 def is_farmers_hand(hand):
-    return all(rank in ("9", "10") for rank, _ in hand)
+    return len(hand) == 5 and all(rank in ("9", "10") for rank, _ in hand)
 
 
 def swap_farmers_hand(hand, keep_cards, hidden_kitty):
