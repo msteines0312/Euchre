@@ -303,6 +303,15 @@ def make_ai_discard_decision_fn(mistake_rate, rng=random):
     return decision_fn
 
 
+def make_ai_farmers_hand_decision_fn():
+    # AI always swaps when eligible; trump isn't picked yet at this point in
+    # the hand, so there's no strength signal to prefer one 9/10 over another
+    # -- just keep the first two cards dealt.
+    def decision_fn(hand):
+        return hand[:2]
+    return decision_fn
+
+
 # --- Human decision functions (terminal I/O + oracle logging) ---------------
 
 def _prompt_choice(prompt, valid_choices):
@@ -365,13 +374,46 @@ def make_human_discard_decision_fn(decisions_log):
     return decision_fn
 
 
+def make_human_farmers_hand_decision_fn():
+    def decision_fn(hand):
+        print(f"Your hand is all 9s and 10s: {hand}")
+        raw = input("Swap 3 cards for the kitty? (y/n): ").strip().lower()
+        if raw != "y":
+            return None
+        remaining = hand[:]
+        keep_cards = []
+        for i in range(2):
+            while True:
+                raw_card = input(f"Keep card {i + 1} of 2 (rank suit): ").strip().split()
+                if len(raw_card) == 2 and tuple(raw_card) in remaining:
+                    card = tuple(raw_card)
+                    keep_cards.append(card)
+                    remaining.remove(card)
+                    break
+                print(f"Please enter one of: {remaining}")
+        return keep_cards
+    return decision_fn
+
+
 # --- Full hand and game loop -----------------------------------------------
 
 TEAM_OF_SEAT = {0: 0, 2: 0, 1: 1, 3: 1}
 
 
-def play_hand(hands, dealer_seat, up_card, hidden_kitty, bid_decision_fns, card_decision_fns, discard_decision_fns):
+def play_hand(hands, dealer_seat, up_card, hidden_kitty, bid_decision_fns, card_decision_fns,
+              discard_decision_fns, farmers_hand_decision_fns):
     turned_suit = up_card[1]
+
+    # Only one seat can take the kitty, so the first eligible non-dealer
+    # (going around from left of dealer) who opts in ends the search.
+    if RULES["farmers_hand"]:
+        for offset in range(1, 4):
+            seat = (dealer_seat + offset) % 4
+            if is_farmers_hand(hands[seat]):
+                keep_cards = farmers_hand_decision_fns[seat](hands[seat])
+                if keep_cards is not None:
+                    hands[seat] = swap_farmers_hand(hands[seat], keep_cards, hidden_kitty)
+                    break
 
     result = run_round1_bidding(hands, turned_suit, dealer_seat, bid_decision_fns)
     trump = turned_suit
@@ -409,7 +451,7 @@ def play_hand(hands, dealer_seat, up_card, hidden_kitty, bid_decision_fns, card_
     return points_by_team, making_team, alone
 
 
-def play_game(bid_decision_fns, card_decision_fns, discard_decision_fns):
+def play_game(bid_decision_fns, card_decision_fns, discard_decision_fns, farmers_hand_decision_fns):
     scores = {0: 0, 1: 0}
     dealer_seat = 0
     while max(scores.values()) < 10:
@@ -417,7 +459,8 @@ def play_game(bid_decision_fns, card_decision_fns, discard_decision_fns):
         random.shuffle(deck)
         hands, up_card, hidden_kitty = deal_hands(deck)
         result = play_hand(hands, dealer_seat, up_card, hidden_kitty,
-                            bid_decision_fns, card_decision_fns, discard_decision_fns)
+                            bid_decision_fns, card_decision_fns, discard_decision_fns,
+                            farmers_hand_decision_fns)
         if result is not None:
             points_by_team, _, _ = result
             for team, points in points_by_team.items():
@@ -456,8 +499,14 @@ def main():
         make_ai_discard_decision_fn(MISTAKE_RATES[tier]),
         make_ai_discard_decision_fn(MISTAKE_RATES[tier]),
     ]
+    farmers_hand_decision_fns = [
+        make_human_farmers_hand_decision_fn(),
+        make_ai_farmers_hand_decision_fn(),
+        make_ai_farmers_hand_decision_fn(),
+        make_ai_farmers_hand_decision_fn(),
+    ]
 
-    winning_team = play_game(bid_decision_fns, card_decision_fns, discard_decision_fns)
+    winning_team = play_game(bid_decision_fns, card_decision_fns, discard_decision_fns, farmers_hand_decision_fns)
     print(f"Team {winning_team} wins the game!")
 
     quality_rate = compute_quality_rate(decisions_log)
