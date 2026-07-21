@@ -1,5 +1,5 @@
 import random
-from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand, recommend_bid_action, recommend_discard, run_round1_bidding, run_round2_bidding, legal_plays, is_legal_play, recommend_card_play, determine_trick_winner, play_trick, score_hand, load_mmr, save_mmr, compute_quality_rate, update_mmr, difficulty_tier, apply_mistake, make_ai_bid_decision_fn, make_ai_card_decision_fn, make_ai_discard_decision_fn
+from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand, recommend_bid_action, recommend_discard, run_round1_bidding, run_round2_bidding, legal_plays, is_legal_play, recommend_card_play, determine_trick_winner, play_trick, score_hand, load_mmr, save_mmr, compute_quality_rate, update_mmr, difficulty_tier, apply_mistake, make_ai_bid_decision_fn, make_ai_card_decision_fn, make_ai_discard_decision_fn, play_hand
 
 def test_deal_hands_gives_four_five_card_hands():
     deck = create_deck()
@@ -437,3 +437,34 @@ def test_human_discard_decision_fn_reprompts_on_invalid_input(monkeypatch):
     decision_fn = make_human_discard_decision_fn(decisions_log)
     result = decision_fn(hand, trump="Spades")
     assert result == ("9", "Hearts")
+
+
+def test_play_hand_scores_a_full_hand_deterministically():
+    # Team 0 = seats 0,2 ; Team 1 = seats 1,3. Seat 0 orders up Spades and the
+    # team runs the table (march) by always playing their highest legal card.
+    hands = [
+        [("J", "Spades"), ("J", "Clubs"), ("A", "Spades"), ("K", "Spades"), ("Q", "Spades")],
+        [("9", "Hearts"), ("10", "Hearts"), ("Q", "Hearts"), ("K", "Hearts"), ("A", "Hearts")],
+        [("9", "Diamonds"), ("10", "Diamonds"), ("Q", "Diamonds"), ("K", "Diamonds"), ("A", "Diamonds")],
+        [("9", "Clubs"), ("10", "Clubs"), ("Q", "Clubs"), ("K", "Clubs"), ("A", "Clubs")],
+    ]
+    up_card = ("9", "Spades")
+    hidden_kitty = [("9", "Hearts"), ("9", "Diamonds"), ("9", "Clubs")]  # unused once bidding resolves
+
+    bid_decision_fns = [
+        lambda hand, s: "order_up",  # seat 0 orders up
+        lambda hand, s: "pass",
+        lambda hand, s: "pass",
+        lambda hand, s: "pass",
+    ]
+    card_decision_fns = [lambda hand, trick, trump, led: recommend_card_play(hand, trick, trump, led) for _ in range(4)]
+    discard_decision_fns = [lambda hand, trump: recommend_discard(hand, trump) for _ in range(4)]
+
+    result = play_hand(hands, dealer_seat=3, up_card=up_card, hidden_kitty=hidden_kitty,
+                        bid_decision_fns=bid_decision_fns, card_decision_fns=card_decision_fns,
+                        discard_decision_fns=discard_decision_fns)
+    assert result is not None
+    points_by_team, making_team, went_alone = result
+    assert making_team == 0
+    assert went_alone is False
+    assert points_by_team[0] == 2  # march: seat 0's team holds all the trump/high cards

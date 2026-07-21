@@ -357,3 +357,103 @@ def make_human_discard_decision_fn(decisions_log):
         decisions_log.append((actual, recommended))
         return actual
     return decision_fn
+
+
+# --- Full hand and game loop -----------------------------------------------
+
+TEAM_OF_SEAT = {0: 0, 2: 0, 1: 1, 3: 1}
+
+
+def play_hand(hands, dealer_seat, up_card, hidden_kitty, bid_decision_fns, card_decision_fns, discard_decision_fns):
+    turned_suit = up_card[1]
+
+    result = run_round1_bidding(hands, turned_suit, dealer_seat, bid_decision_fns)
+    trump = turned_suit
+    if result is not None:
+        maker_seat, alone = result
+        hands[dealer_seat] = pick_up_card(hands[dealer_seat], up_card)
+        discard_choice = discard_decision_fns[dealer_seat](hands[dealer_seat], trump)
+        hands[dealer_seat] = discard(hands[dealer_seat], discard_choice)
+    else:
+        # bid_decision_fns entries already accept (hand, available_suits, must_call) for
+        # round 2 -- see make_ai_bid_decision_fn / make_human_bid_decision_fn (Tasks 11/12).
+        result = run_round2_bidding(hands, turned_suit, dealer_seat, bid_decision_fns, RULES["stick_the_dealer"])
+        if result is None:
+            return None
+        maker_seat, trump, alone = result
+
+    making_team = TEAM_OF_SEAT[maker_seat]
+    sitting_out_seat = (maker_seat + 2) % 4 if alone else None
+
+    tricks_by_team = {0: 0, 1: 0}
+    leader_seat = (dealer_seat + 1) % 4
+    if leader_seat == sitting_out_seat:
+        leader_seat = (leader_seat + 1) % 4
+
+    for _ in range(5):
+        winner_seat, plays = play_trick(hands, leader_seat, trump, sitting_out_seat, card_decision_fns)
+        tricks_by_team[TEAM_OF_SEAT[winner_seat]] += 1
+        leader_seat = winner_seat
+
+    points_by_team = score_hand(tricks_by_team, making_team, alone)
+    return points_by_team, making_team, alone
+
+
+def play_game(bid_decision_fns, card_decision_fns, discard_decision_fns):
+    scores = {0: 0, 1: 0}
+    dealer_seat = 0
+    while max(scores.values()) < 10:
+        deck = create_deck()
+        random.shuffle(deck)
+        hands, up_card, hidden_kitty = deal_hands(deck)
+        result = play_hand(hands, dealer_seat, up_card, hidden_kitty,
+                            bid_decision_fns, card_decision_fns, discard_decision_fns)
+        if result is not None:
+            points_by_team, _, _ = result
+            for team, points in points_by_team.items():
+                scores[team] += points
+        dealer_seat = (dealer_seat + 1) % 4
+    return 0 if scores[0] > scores[1] else 1
+
+
+def main():
+    mmr_data = load_mmr()
+    tier = difficulty_tier(mmr_data["mmr"])
+    print(f"Current MMR: {mmr_data['mmr']} ({tier} difficulty)")
+    override = input("Press Enter to play at this difficulty, or type easy/medium/hard to override: ").strip()
+    if override in MISTAKE_RATES:
+        tier = override
+
+    decisions_log = []
+    bid_decision_fns = [
+        make_human_bid_decision_fn(decisions_log),
+        make_ai_bid_decision_fn(MISTAKE_RATES[tier]),
+        make_ai_bid_decision_fn(MISTAKE_RATES[tier]),
+        make_ai_bid_decision_fn(MISTAKE_RATES[tier]),
+    ]
+    card_decision_fns = [
+        make_human_card_decision_fn(decisions_log),
+        make_ai_card_decision_fn(MISTAKE_RATES[tier]),
+        make_ai_card_decision_fn(MISTAKE_RATES[tier]),
+        make_ai_card_decision_fn(MISTAKE_RATES[tier]),
+    ]
+    discard_decision_fns = [
+        make_human_discard_decision_fn(decisions_log),
+        make_ai_discard_decision_fn(MISTAKE_RATES[tier]),
+        make_ai_discard_decision_fn(MISTAKE_RATES[tier]),
+        make_ai_discard_decision_fn(MISTAKE_RATES[tier]),
+    ]
+
+    winning_team = play_game(bid_decision_fns, card_decision_fns, discard_decision_fns)
+    print(f"Team {winning_team} wins the game!")
+
+    quality_rate = compute_quality_rate(decisions_log)
+    mmr_data["mmr"] = update_mmr(mmr_data["mmr"], quality_rate)
+    mmr_data["games_played"] += 1
+    save_mmr(mmr_data)
+    print(f"Your decisions matched sound play {quality_rate:.0%} of the time. "
+          f"New MMR: {mmr_data['mmr']}")
+
+
+if __name__ == "__main__":
+    main()
