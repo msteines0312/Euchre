@@ -1,4 +1,17 @@
-from euchre import create_deck, SUITS, RANKS, effective_suit, card_strength
+from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength
+
+def test_deal_hands_gives_four_five_card_hands():
+    deck = create_deck()
+    hands, up_card, hidden_kitty = deal_hands(deck)
+    assert len(hands) == 4
+    assert all(len(hand) == 5 for hand in hands)
+
+def test_deal_hands_up_card_and_kitty_use_remaining_cards():
+    deck = create_deck()
+    hands, up_card, hidden_kitty = deal_hands(deck)
+    assert len(hidden_kitty) == 3
+    dealt = [card for hand in hands for card in hand] + [up_card] + hidden_kitty
+    assert sorted(dealt) == sorted(deck)
 
 def test_create_deck_has_24_unique_cards():
     deck = create_deck()

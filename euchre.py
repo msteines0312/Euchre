@@ -41,3 +41,12 @@ def card_strength(card, trump):
     if effective_suit(card, trump) == trump:
         return 20 + RANK_ORDER[rank]
     return RANK_ORDER[rank]
+
+
+# --- Dealing -------------------------------------------------------------
+
+def deal_hands(deck):
+    hands = [deck[i * 5:(i + 1) * 5] for i in range(4)]
+    up_card = deck[20]
+    hidden_kitty = deck[21:24]
+    return hands, up_card, hidden_kitty
