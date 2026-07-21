@@ -1,4 +1,4 @@
-from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand, recommend_bid_action, recommend_discard, run_round1_bidding, run_round2_bidding, legal_plays, is_legal_play, recommend_card_play
+from euchre import create_deck, deal_hands, SUITS, RANKS, effective_suit, card_strength, pick_up_card, discard, is_farmers_hand, swap_farmers_hand, recommend_bid_action, recommend_discard, run_round1_bidding, run_round2_bidding, legal_plays, is_legal_play, recommend_card_play, determine_trick_winner, play_trick
 
 def test_deal_hands_gives_four_five_card_hands():
     deck = create_deck()
@@ -193,3 +193,43 @@ def test_recommend_card_play_throws_lowest_when_cannot_win():
     hand = [("9", "Hearts"), ("10", "Hearts")]
     result = recommend_card_play(hand, trick_so_far=[("A", "Hearts")], trump="Spades", led_suit="Hearts")
     assert result == ("9", "Hearts")
+
+def test_determine_trick_winner_trump_beats_led_suit():
+    plays = [(0, ("A", "Hearts")), (1, ("9", "Spades")), (2, ("K", "Hearts")), (3, ("10", "Hearts"))]
+    assert determine_trick_winner(plays, trump="Spades") == 1
+
+def test_determine_trick_winner_highest_of_led_suit_when_no_trump():
+    plays = [(0, ("9", "Hearts")), (1, ("A", "Hearts")), (2, ("K", "Diamonds")), (3, ("10", "Hearts"))]
+    assert determine_trick_winner(plays, trump="Spades") == 1
+
+def test_determine_trick_winner_left_bower_beats_other_trump():
+    plays = [(0, ("A", "Spades")), (1, ("J", "Clubs")), (2, ("9", "Hearts")), (3, ("K", "Spades"))]
+    assert determine_trick_winner(plays, trump="Spades") == 1
+
+def test_play_trick_removes_played_cards_and_returns_winner():
+    hands = [
+        [("A", "Hearts")],
+        [("9", "Spades")],
+        [("K", "Hearts")],
+        [("10", "Hearts")],
+    ]
+    def decision_fn(seat):
+        return lambda hand, trick_so_far, trump, led_suit: hand[0]
+    decision_fns = [decision_fn(s) for s in range(4)]
+    winner, plays = play_trick(hands, leader_seat=0, trump="Spades", sitting_out_seat=None, decision_fns=decision_fns)
+    assert winner == 1
+    assert all(len(hand) == 0 for hand in hands)
+    assert len(plays) == 4
+
+def test_play_trick_skips_sitting_out_seat():
+    hands = [
+        [("9", "Hearts")],
+        [],  # sitting out (loner's partner)
+        [("A", "Hearts")],
+        [("K", "Hearts")],
+    ]
+    decision_fns = [lambda hand, t, tr, l: hand[0] for _ in range(4)]
+    winner, plays = play_trick(hands, leader_seat=0, trump="Spades", sitting_out_seat=1, decision_fns=decision_fns)
+    seats_played = [seat for seat, card in plays]
+    assert seats_played == [0, 2, 3]
+    assert winner == 2

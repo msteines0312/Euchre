@@ -164,3 +164,39 @@ def recommend_card_play(hand, trick_so_far, trump, led_suit):
     if winning_options:
         return min(winning_options, key=lambda c: card_strength(c, trump))
     return min(options, key=lambda c: card_strength(c, trump))
+
+
+# --- Trick orchestration -----------------------------------------------
+
+def determine_trick_winner(plays, trump):
+    led_suit = effective_suit(plays[0][1], trump)
+
+    def rank(play):
+        seat, card = play
+        if effective_suit(card, trump) == trump:
+            return (2, card_strength(card, trump))
+        if card[1] == led_suit:
+            return (1, card_strength(card, trump))
+        return (0, 0)
+
+    winner_seat, _ = max(plays, key=rank)
+    return winner_seat
+
+
+def play_trick(hands, leader_seat, trump, sitting_out_seat, decision_fns):
+    plays = []
+    led_suit = None
+    seat = leader_seat
+    for _ in range(4):
+        if seat == sitting_out_seat:
+            seat = (seat + 1) % 4
+            continue
+        hand = hands[seat]
+        card = decision_fns[seat](hand, [c for _, c in plays], trump, led_suit)
+        hand.remove(card)
+        if led_suit is None:
+            led_suit = effective_suit(card, trump)
+        plays.append((seat, card))
+        seat = (seat + 1) % 4
+    winner_seat = determine_trick_winner(plays, trump)
+    return winner_seat, plays
