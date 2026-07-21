@@ -284,5 +284,7 @@ def test_update_mmr_penalizes_below_baseline():
 
 def test_difficulty_tier_thresholds():
     assert difficulty_tier(800) == "easy"
+    assert difficulty_tier(900) == "medium"
     assert difficulty_tier(1200) == "medium"
+    assert difficulty_tier(1500) == "hard"
     assert difficulty_tier(1600) == "hard"
