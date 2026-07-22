@@ -94,8 +94,8 @@ function makeAiBidDecisionFn(mistakeRate, rng = Math.random) {
 }
 
 function makeAiCardDecisionFn(mistakeRate, rng = Math.random) {
-  return (hand, trickSoFar, trump, ledSuit) => {
-    const recommended = recommendCardPlay(hand, trickSoFar, trump, ledSuit);
+  return (hand, trickPlays, trump, ledSuit, seat = null) => {
+    const recommended = recommendCardPlay(hand, trickPlays, trump, ledSuit, seat);
     const options = legalPlays(hand, ledSuit, trump);
     const alternatives = options.filter((c) => !cardsEqual(c, recommended));
     return applyMistake(recommended, alternatives, mistakeRate, rng);

@@ -139,16 +139,62 @@ function isLegalPlay(card, hand, ledSuit, trump) {
   return legalPlays(hand, ledSuit, trump).some((c) => cardsEqual(c, card));
 }
 
-function recommendCardPlay(hand, trickSoFar, trump, ledSuit) {
+// A card's standing *within a specific trick*: trump beats led suit beats
+// everything else (an off-suit card that didn't follow suit can never win,
+// no matter how high its rank -- it only ever ranks [0, 0]).
+function trickRank(card, trump, ledSuit) {
+  if (effectiveSuit(card, trump) === trump) return [2, cardStrength(card, trump)];
+  if (card[1] === ledSuit) return [1, cardStrength(card, trump)];
+  return [0, 0];
+}
+
+function rankBeats(a, b) {
+  return a[0] > b[0] || (a[0] === b[0] && a[1] > b[1]);
+}
+
+// plays: array of {seat, card} played so far this trick, in play order.
+// Returns the seat currently holding the best card, or null if plays is empty.
+function currentTrickLeader(plays, trump, ledSuit) {
+  if (!plays.length) return null;
+  let winner = plays[0];
+  let winnerRank = trickRank(winner.card, trump, ledSuit);
+  for (const play of plays.slice(1)) {
+    const r = trickRank(play.card, trump, ledSuit);
+    if (rankBeats(r, winnerRank)) {
+      winner = play;
+      winnerRank = r;
+    }
+  }
+  return winner.seat;
+}
+
+// Would `card` beat the best card played so far this trick? An empty
+// trickPlays means `card` is leading, which always "wins" for this purpose.
+function wouldWinTrick(card, trickPlays, trump, ledSuit) {
+  if (!trickPlays.length) return true;
+  const bestRank = trickPlays.reduce((best, p) => {
+    const r = trickRank(p.card, trump, ledSuit);
+    return rankBeats(r, best) ? r : best;
+  }, [-1, -1]);
+  return rankBeats(trickRank(card, trump, ledSuit), bestRank);
+}
+
+// trickPlays: array of {seat, card} already played this trick (not including `seat`).
+// seat: the seat about to play (needed to tell a winning partner from a winning opponent).
+function recommendCardPlay(hand, trickPlays, trump, ledSuit, seat = null) {
   const options = legalPlays(hand, ledSuit, trump);
   if (ledSuit === null) {
     return options.reduce((best, c) => (cardStrength(c, trump) > cardStrength(best, trump) ? c : best));
   }
-  let winningOptions = options;
-  if (trickSoFar.length) {
-    const bestPlayed = Math.max(...trickSoFar.map((c) => cardStrength(c, trump)));
-    winningOptions = options.filter((c) => cardStrength(c, trump) > bestPlayed);
+
+  const leaderSeat = currentTrickLeader(trickPlays, trump, ledSuit);
+  const partnerIsWinning = leaderSeat !== null && seat !== null && TEAM_OF_SEAT[leaderSeat] === TEAM_OF_SEAT[seat];
+  if (partnerIsWinning) {
+    // Your partner already holds the best card -- don't waste strength beating your own team.
+    return options.reduce((worst, c) => (cardStrength(c, trump) < cardStrength(worst, trump) ? c : worst));
   }
+
+  const winningOptions = options.filter((c) => wouldWinTrick(c, trickPlays, trump, ledSuit));
   const pool = winningOptions.length ? winningOptions : options;
   return pool.reduce((best, c) => (cardStrength(c, trump) < cardStrength(best, trump) ? c : best));
 }
@@ -158,22 +204,7 @@ function recommendCardPlay(hand, trickSoFar, trump, ledSuit) {
 // plays: array of {seat, card} in play order.
 function determineTrickWinner(plays, trump) {
   const ledSuit = effectiveSuit(plays[0].card, trump);
-  function rank(play) {
-    const card = play.card;
-    if (effectiveSuit(card, trump) === trump) return [2, cardStrength(card, trump)];
-    if (card[1] === ledSuit) return [1, cardStrength(card, trump)];
-    return [0, 0];
-  }
-  let winner = plays[0];
-  let winnerRank = rank(winner);
-  for (const play of plays.slice(1)) {
-    const r = rank(play);
-    if (r[0] > winnerRank[0] || (r[0] === winnerRank[0] && r[1] > winnerRank[1])) {
-      winner = play;
-      winnerRank = r;
-    }
-  }
-  return winner.seat;
+  return currentTrickLeader(plays, trump, ledSuit);
 }
 
 // --- Scoring ---------------------------------------------------------------
@@ -212,6 +243,8 @@ export {
   legalPlays,
   isLegalPlay,
   recommendCardPlay,
+  currentTrickLeader,
+  wouldWinTrick,
   determineTrickWinner,
   scoreHand,
 };

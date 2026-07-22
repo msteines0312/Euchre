@@ -21,6 +21,8 @@ function knockVerb(seat) {
 }
 
 const rules = { ...E.DEFAULT_RULES };
+const THEME_KEY = "euchre-theme-v1";
+let tableTheme = "felt";
 let difficultyOverride = "auto";
 let currentPlayerName = "Player";
 let mmrData = { mmr: 1000, gamesPlayed: 0 };
@@ -48,6 +50,30 @@ function aiFns() {
     card: AI.makeAiCardDecisionFn(rate),
     discard: AI.makeAiDiscardDecisionFn(rate),
   };
+}
+
+// ===== Table theme ==========================================================
+
+function loadTableTheme() {
+  try {
+    return localStorage.getItem(THEME_KEY) || "felt";
+  } catch {
+    return "felt";
+  }
+}
+
+function saveTableTheme(theme) {
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+  } catch {
+    // localStorage unavailable — theme choice just won't persist.
+  }
+}
+
+function applyTableTheme(theme) {
+  tableTheme = theme;
+  document.body.dataset.theme = theme;
+  saveTableTheme(theme);
 }
 
 // ===== Player identity + AI names ==========================================
@@ -574,11 +600,18 @@ async function sweepTrick(winnerSeat) {
 }
 
 // Explains *why* recommendCardPlay's choice is right for the current trick state.
-function cardPlayWhy(trickCardsSoFar, trump, ledSuit, recommended) {
+// trickPlays is the {seat, card} list of what's been played so far (needed to tell
+// a winning partner from a winning opponent, since the two call for opposite plays).
+function cardPlayWhy(trickPlays, trump, ledSuit, recommended, seat) {
   if (ledSuit === null) {
     return "leading your strongest card here puts pressure on the table early";
   }
-  const bestPlayed = trickCardsSoFar.length ? Math.max(...trickCardsSoFar.map((c) => E.cardStrength(c, trump))) : -1;
+  const leaderSeat = E.currentTrickLeader(trickPlays, trump, ledSuit);
+  const partnerIsWinning = leaderSeat !== null && E.TEAM_OF_SEAT[leaderSeat] === E.TEAM_OF_SEAT[seat];
+  if (partnerIsWinning) {
+    return `your partner (${SEAT_NAMES[leaderSeat]}) already has this trick won, so toss your weakest card and save your strong ones`;
+  }
+  const bestPlayed = trickPlays.length ? Math.max(...trickPlays.map((p) => E.cardStrength(p.card, trump))) : -1;
   const winsIt = E.cardStrength(recommended, trump) > bestPlayed;
   if (winsIt) {
     return "it wins the trick while spending as little strength as possible";
@@ -598,10 +631,9 @@ async function playTrick(leaderSeat, trump) {
     let card;
     if (seat === 0) {
       const legal = E.legalPlays(hands[0], ledSuit, trump);
-      const trickCardsSoFar = plays.map((p) => p.card);
-      const recommended = E.recommendCardPlay(hands[0], trickCardsSoFar, trump, ledSuit);
+      const recommended = E.recommendCardPlay(hands[0], plays, trump, ledSuit, 0);
       setHint({
-        text: `Try the ${cardLabel(recommended)} — ${cardPlayWhy(trickCardsSoFar, trump, ledSuit, recommended)}.`,
+        text: `Try the ${cardLabel(recommended)} — ${cardPlayWhy(plays, trump, ledSuit, recommended, 0)}.`,
         selector: cardSelector("hand-0", recommended),
       });
       showToast("Your turn — pick a card.", 0);
@@ -611,7 +643,7 @@ async function playTrick(leaderSeat, trump) {
     } else {
       showToast(`${SEAT_NAMES[seat]} is thinking...`, 0);
       await sleep(550 + Math.random() * 500);
-      card = aiFns().card(hands[seat], plays.map((p) => p.card), trump, ledSuit);
+      card = aiFns().card(hands[seat], plays, trump, ledSuit, seat);
       hideToast();
     }
     removeCardFromHand(seat, card);
@@ -811,8 +843,11 @@ function applyRuleSwitches() {
   $("rule-alone").checked = rules.allowGoingAlone;
   $("rule-stick").checked = rules.stickTheDealer;
   $("rule-farmers").checked = rules.farmersHand;
-  document.querySelectorAll(".btn-choice").forEach((btn) => {
+  document.querySelectorAll("[data-difficulty]").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.difficulty === difficultyOverride);
+  });
+  document.querySelectorAll("[data-theme-choice]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.themeChoice === tableTheme);
   });
 }
 
@@ -820,11 +855,17 @@ function wireSettings() {
   $("rule-alone").addEventListener("change", (e) => { rules.allowGoingAlone = e.target.checked; });
   $("rule-stick").addEventListener("change", (e) => { rules.stickTheDealer = e.target.checked; });
   $("rule-farmers").addEventListener("change", (e) => { rules.farmersHand = e.target.checked; });
-  document.querySelectorAll(".btn-choice").forEach((btn) => {
+  document.querySelectorAll("[data-difficulty]").forEach((btn) => {
     btn.addEventListener("click", () => {
       difficultyOverride = btn.dataset.difficulty;
       applyRuleSwitches();
       updateDifficultyChip();
+    });
+  });
+  document.querySelectorAll("[data-theme-choice]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      applyTableTheme(btn.dataset.themeChoice);
+      applyRuleSwitches();
     });
   });
   $("settings-btn").addEventListener("click", () => { applyRuleSwitches(); showOverlay("settings-overlay"); });
@@ -849,6 +890,8 @@ function init() {
 
   wireSettings();
   window.addEventListener("resize", () => { try { updateDealerChip(); } catch {} });
+
+  applyTableTheme(loadTableTheme());
 
   const savedName = loadPlayerName();
   if (savedName) {

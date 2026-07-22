@@ -4,8 +4,9 @@
     {
       "name": "euchre-web",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8420"],
-      "port": 8420
+      "runtimeArgs": ["scripts/serve.py"],
+      "port": 8420,
+      "autoPort": true
     }
   ]
 }
