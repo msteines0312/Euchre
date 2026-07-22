@@ -515,7 +515,9 @@ async function runRound1Bidding(turnedSuit) {
   return null;
 }
 
-function bid2Hint(hand, recommended) {
+// isForcedCall is true when "stick the dealer" is the only reason this seat
+// can't pass -- the hand itself wasn't strong enough to call on its own merits.
+function bid2Hint(hand, recommended, isForcedCall = false) {
   if (recommended === "pass") {
     return {
       text: "Pass — none of the remaining suits give you enough trump to make a call worthwhile.",
@@ -525,6 +527,12 @@ function bid2Hint(hand, recommended) {
   const { count, hasRight, hasLeft } = trumpCountAndBowers(hand, recommended.suit);
   const bowerNote = bowerClause(hasRight, hasLeft);
   const plural = count === 1 ? "" : "s";
+  if (isForcedCall) {
+    return {
+      text: `Call ${recommended.suit} — as dealer you're stuck and must call a suit, and this is your best option with ${count} trump card${plural}${bowerNote}.`,
+      selector: `#bid2-suit-grid .suit-btn[data-suit="${recommended.suit}"]`,
+    };
+  }
   const aloneNote = recommended.alone
     ? ` That's strong enough to go alone for extra points, too.`
     : "";
@@ -536,7 +544,9 @@ function bid2Hint(hand, recommended) {
 
 async function getHumanBidRound2(hand, availableSuits, mustCall) {
   const recommended = E.recommendBidAction(hand, { roundNum: 2, isDealer: mustCall, availableSuits });
-  setHint(bid2Hint(hand, recommended));
+  const isForcedCall = mustCall && recommended !== "pass"
+    && E.recommendBidAction(hand, { roundNum: 2, isDealer: false, availableSuits }) === "pass";
+  setHint(bid2Hint(hand, recommended, isForcedCall));
   const actual = await showBid2Modal(availableSuits, mustCall);
   clearHint();
   const normalizedActual = actual === "pass" ? "pass" : `${actual.suit}:${actual.alone}`;
@@ -611,8 +621,7 @@ function cardPlayWhy(trickPlays, trump, ledSuit, recommended, seat) {
   if (partnerIsWinning) {
     return `your partner (${SEAT_NAMES[leaderSeat]}) already has this trick won, so toss your weakest card and save your strong ones`;
   }
-  const bestPlayed = trickPlays.length ? Math.max(...trickPlays.map((p) => E.cardStrength(p.card, trump))) : -1;
-  const winsIt = E.cardStrength(recommended, trump) > bestPlayed;
+  const winsIt = E.wouldWinTrick(recommended, trickPlays, trump, ledSuit);
   if (winsIt) {
     return "it wins the trick while spending as little strength as possible";
   }
